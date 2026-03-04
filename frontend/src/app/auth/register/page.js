@@ -85,7 +85,7 @@ export default function Register() {
                                 Full Name
                             </label>
                             <div className="relative">
-                                <User className="absolute left-3 top-1/2 h-5 w-5 text-gray-400" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                                 <Input
                                     id="name"
                                     name="name"
@@ -95,6 +95,7 @@ export default function Register() {
                                     onChange={handleChange}
                                     error={!!error}
                                     disabled={loading}
+                                    hasIcon={true}
                                 />
                             </div>
                         </div>
@@ -105,7 +106,7 @@ export default function Register() {
                                 Email Address
                             </label>
                             <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 h-5 w-5 text-gray-400" />
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                                 <Input
                                     id="email"
                                     name="email"
@@ -115,6 +116,7 @@ export default function Register() {
                                     onChange={handleChange}
                                     error={!!error}
                                     disabled={loading}
+                                    hasIcon={true}
                                 />
                             </div>
                         </div>
@@ -145,7 +147,7 @@ export default function Register() {
                                 Password
                             </label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 h-5 w-5 text-gray-400" />
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                                 <Input
                                     id="password"
                                     name="password"
@@ -155,6 +157,7 @@ export default function Register() {
                                     onChange={handleChange}
                                     error={!!error}
                                     disabled={loading}
+                                    hasIcon={true}
                                 />
                             </div>
                         </div>
@@ -165,7 +168,7 @@ export default function Register() {
                                 Confirm Password
                             </label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 h-5 w-5 text-gray-400" />
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                                 <Input
                                     id="confirmPassword"
                                     name="confirmPassword"
@@ -175,6 +178,7 @@ export default function Register() {
                                     onChange={handleChange}
                                     error={!!error}
                                     disabled={loading}
+                                    hasIcon={true}
                                 />
                             </div>
                         </div>
