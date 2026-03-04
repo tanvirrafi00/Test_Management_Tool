@@ -8,8 +8,8 @@ export function Input({
     onChange,
     error = '',
     disabled = false,
-    className = '',
     hasIcon = false,
+    className = '',
     ...props
 }) {
     const baseStyles = hasIcon
@@ -42,3 +42,4 @@ export function Input({
         </div>
     );
 }
+
