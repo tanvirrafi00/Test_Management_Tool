@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { authAPI } from '../lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export function useAuth() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
+        // Skip fetching user on auth pages to prevent infinite loops
+        if (pathname?.startsWith('/auth/')) {
+            setLoading(false);
+            return;
+        }
+
         // Fetch user data from backend to verify authentication
         const fetchUser = async () => {
             try {
@@ -22,7 +29,7 @@ export function useAuth() {
         };
 
         fetchUser();
-    }, []);
+    }, [pathname]);
 
     const login = async (email, password) => {
         try {
