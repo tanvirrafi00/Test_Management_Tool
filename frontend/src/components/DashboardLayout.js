@@ -117,15 +117,18 @@ export default function DashboardLayout({ children }) {
                                     key={item.name}
                                     href={item.href}
                                     className={cn(
-                                        'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                                        'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group',
                                         isActive
-                                            ? 'bg-primary-50 text-primary-600 border-l-4 border-primary-500'
-                                            : 'text-gray-700 hover:bg-gray-50 border-l-4 border-transparent hover:border-gray-200'
+                                            ? 'bg-primary-50 text-primary-700'
+                                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                                     )}
                                 >
-                                    <item.icon className={cn('h-5 w-5', isActive ? 'text-primary-600' : 'text-gray-500')} />
-                                    <span className="ml-3">{item.name}</span>
-                                    {isActive && <ChevronRight className="ml-auto h-4 w-4 text-primary-600" />}
+                                    <item.icon className={cn(
+                                        'h-5 w-5 mr-3 flex-shrink-0 transition-colors duration-200',
+                                        isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600'
+                                    )} />
+                                    <span>{item.name}</span>
+                                    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-600" />}
                                 </Link>
                             );
                         })}
@@ -143,17 +146,18 @@ export default function DashboardLayout({ children }) {
                             </div>
                         ) : user ? (
                             <>
-                                <div className="flex items-center mb-3">
-                                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                                <Link href="/profile" className="flex items-center mb-3 hover:bg-gray-50 rounded-lg p-1 transition-colors">
+                                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                                         <User className="h-6 w-6 text-primary-600" />
                                     </div>
-                                    <div className="ml-3">
-                                        <p className="text-sm font-medium text-gray-900">{user.name || 'User'}</p>
+                                    <div className="ml-3 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">{user.name || 'User'}</p>
                                         <p className="text-xs text-gray-500 capitalize">
                                             {userRole?.replace('_', ' ') || 'Guest'}
                                         </p>
                                     </div>
-                                </div>
+                                    <ChevronRight className="h-4 w-4 text-gray-400 ml-auto flex-shrink-0" />
+                                </Link>
                                 <button
                                     onClick={logout}
                                     className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
