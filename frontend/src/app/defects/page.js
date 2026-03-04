@@ -52,7 +52,10 @@ export default function Defects() {
         title: '',
         description: '',
         stepsToReproduce: '',
-        severity: 'medium',
+        expectedResult: '',
+        actualResult: '',
+        severity: 'minor',
+        priority: 'medium',
         projectId: '',
         testCaseId: '',
         executionId: '',
@@ -253,11 +256,14 @@ export default function Defects() {
             title: defect.title,
             description: defect.description || '',
             stepsToReproduce: defect.stepsToReproduce || '',
-            severity: defect.severity || 'medium',
-            projectId: defect.projectId,
-            testCaseId: defect.testCaseId || '',
-            executionId: defect.executionId || '',
-            assignedTo: defect.assignedTo || '',
+            expectedResult: defect.expectedResult || '',
+            actualResult: defect.actualResult || '',
+            severity: defect.severity || 'minor',
+            priority: defect.priority || 'medium',
+            projectId: defect.project?._id || defect.projectId || '',
+            testCaseId: defect.linkedTestCase?._id || defect.testCaseId || '',
+            executionId: defect.linkedExecution?._id || defect.executionId || '',
+            assignedTo: defect.assignedTo?._id || defect.assignedTo || '',
         });
         setShowEditModal(true);
     };
@@ -294,7 +300,10 @@ export default function Defects() {
             title: '',
             description: '',
             stepsToReproduce: '',
-            severity: 'medium',
+            expectedResult: '',
+            actualResult: '',
+            severity: 'minor',
+            priority: 'medium',
             projectId: '',
             testCaseId: '',
             executionId: '',
@@ -333,6 +342,18 @@ export default function Defects() {
     const getUserName = (userId) => {
         const user = users.find(u => u._id === userId);
         return user?.name || 'Unassigned';
+    };
+
+    // Get priority badge
+    const getPriorityBadge = (priority) => {
+        const priorityConfig = {
+            low: { variant: 'default', label: 'Low' },
+            medium: { variant: 'info', label: 'Medium' },
+            high: { variant: 'warning', label: 'High' },
+            critical: { variant: 'danger', label: 'Critical' },
+        };
+        const config = priorityConfig[priority] || priorityConfig.medium;
+        return <Badge variant={config.variant}>{config.label}</Badge>;
     };
 
     // Get severity badge
@@ -484,11 +505,12 @@ export default function Defects() {
                             <Card key={defect._id} className="p-6 hover:shadow-md transition-shadow">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
+                                        <div className="flex items-center gap-3 mb-2 flex-wrap">
                                             <h3 className="text-lg font-semibold text-gray-900">
                                                 {defect.title}
                                             </h3>
                                             {getSeverityBadge(defect.severity)}
+                                            {getPriorityBadge(defect.priority)}
                                             {getStatusBadge(defect.status)}
                                         </div>
                                         <p className="text-sm text-gray-600 line-clamp-2 mb-2">
@@ -533,6 +555,22 @@ export default function Defects() {
                                                     <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-line">
                                                         {defect.stepsToReproduce}
                                                     </p>
+                                                </div>
+                                            )}
+                                            {(defect.expectedResult || defect.actualResult) && (
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {defect.expectedResult && (
+                                                        <div>
+                                                            <h4 className="text-sm font-medium text-gray-700 mb-1">Expected Result</h4>
+                                                            <p className="text-sm text-gray-600 bg-green-50 p-2 rounded-lg">{defect.expectedResult}</p>
+                                                        </div>
+                                                    )}
+                                                    {defect.actualResult && (
+                                                        <div>
+                                                            <h4 className="text-sm font-medium text-gray-700 mb-1">Actual Result</h4>
+                                                            <p className="text-sm text-gray-600 bg-red-50 p-2 rounded-lg">{defect.actualResult}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                             {defect.testCaseId && (
@@ -679,6 +717,30 @@ export default function Defects() {
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Expected Result</label>
+                                    <textarea
+                                        name="expectedResult"
+                                        value={formData.expectedResult}
+                                        onChange={handleInputChange}
+                                        placeholder="What was expected to happen"
+                                        rows={3}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Actual Result</label>
+                                    <textarea
+                                        name="actualResult"
+                                        value={formData.actualResult}
+                                        onChange={handleInputChange}
+                                        placeholder="What actually happened"
+                                        rows={3}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
                                     <select
                                         name="projectId"
@@ -709,6 +771,20 @@ export default function Defects() {
                                         <option value="critical">Critical</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                                <select
+                                    name="priority"
+                                    value={formData.priority}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
@@ -833,6 +909,30 @@ export default function Defects() {
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Expected Result</label>
+                                    <textarea
+                                        name="expectedResult"
+                                        value={formData.expectedResult}
+                                        onChange={handleInputChange}
+                                        placeholder="What was expected to happen"
+                                        rows={3}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Actual Result</label>
+                                    <textarea
+                                        name="actualResult"
+                                        value={formData.actualResult}
+                                        onChange={handleInputChange}
+                                        placeholder="What actually happened"
+                                        rows={3}
+                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
                                     <select
                                         name="projectId"
@@ -863,6 +963,20 @@ export default function Defects() {
                                         <option value="critical">Critical</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                                <select
+                                    name="priority"
+                                    value={formData.priority}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
@@ -1037,8 +1151,8 @@ export default function Defects() {
                                         type="button"
                                         onClick={() => setFormData(prev => ({ ...prev, status }))}
                                         className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-colors ${formData.status === status
-                                                ? 'border-primary-500 bg-primary-50'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-primary-500 bg-primary-50'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <span className="font-medium text-gray-900 capitalize">
@@ -1085,8 +1199,9 @@ export default function Defects() {
                             <div className="space-y-4">
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedDefect.title}</h3>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         {getSeverityBadge(selectedDefect.severity)}
+                                        {getPriorityBadge(selectedDefect.priority)}
                                         {getStatusBadge(selectedDefect.status)}
                                     </div>
                                 </div>
@@ -1100,6 +1215,22 @@ export default function Defects() {
                                         {selectedDefect.stepsToReproduce || 'Not provided'}
                                     </p>
                                 </div>
+                                {(selectedDefect.expectedResult || selectedDefect.actualResult) && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <h4 className="text-sm font-medium text-gray-700 mb-1">Expected Result</h4>
+                                            <p className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+                                                {selectedDefect.expectedResult || 'Not provided'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-medium text-gray-700 mb-1">Actual Result</h4>
+                                            <p className="text-sm text-gray-600 bg-red-50 p-3 rounded-lg">
+                                                {selectedDefect.actualResult || 'Not provided'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <h4 className="text-sm font-medium text-gray-700 mb-1">Project</h4>
@@ -1142,8 +1273,8 @@ export default function Defects() {
                                             <div key={status} className="flex items-center">
                                                 <div
                                                     className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedDefect.status === status
-                                                            ? 'bg-primary-100 text-primary-800 border-2 border-primary-500'
-                                                            : 'bg-gray-100 text-gray-600 border-2 border-transparent'
+                                                        ? 'bg-primary-100 text-primary-800 border-2 border-primary-500'
+                                                        : 'bg-gray-100 text-gray-600 border-2 border-transparent'
                                                         }`}
                                                 >
                                                     {status.replace('_', ' ')}
