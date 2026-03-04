@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -23,6 +24,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
