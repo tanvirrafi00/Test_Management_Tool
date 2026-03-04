@@ -133,7 +133,7 @@ cp .env.example .env
 
 **Backend Environment Variables:**
 ```env
-PORT=5000
+PORT=5001
 NODE_ENV=development
 MONGODB_URI=mongodb://localhost:27017/testflow
 JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
@@ -153,7 +153,7 @@ cd frontend
 npm install
 
 # Create .env.local file (optional)
-echo "NEXT_PUBLIC_API_URL=http://localhost:5000/api" > .env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:5001/api" > .env.local
 ```
 
 ### 4. Start MongoDB
@@ -168,6 +168,24 @@ mongod
 # Update MONGODB_URI in backend/.env with your Atlas connection string
 ```
 
+### 5. Create Test Users (Optional)
+
+To quickly test the application, you can create test users with different roles:
+
+```bash
+cd backend
+node create-test-user.js
+```
+
+This will create 4 test users with the following credentials:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@testflow.com | admin123 |
+| QA Lead | qa.lead@testflow.com | lead123 |
+| QA Engineer | qa.engineer@testflow.com | engineer123 |
+| Viewer | viewer@testflow.com | viewer123 |
+
 ## 🚀 Running the Application
 
 ### Start Backend Server
@@ -177,7 +195,7 @@ cd backend
 npm run dev
 ```
 
-The backend server will run on `http://localhost:5000`
+The backend server will run on `http://localhost:5001`
 
 ### Start Frontend Development Server
 
@@ -201,6 +219,14 @@ The frontend will run on `http://localhost:3000`
 
 ### 2. Login
 
+**Option A: Use Test Users**
+- If you've run the test user creation script, use these credentials:
+  - Admin: `admin@testflow.com` / `admin123`
+  - QA Lead: `qa.lead@testflow.com` / `lead123`
+  - QA Engineer: `qa.engineer@testflow.com` / `engineer123`
+  - Viewer: `viewer@testflow.com` / `viewer123`
+
+**Option B: Use Your Registered Account**
 1. Navigate to `http://localhost:3000/auth/login`
 2. Enter your email and password
 3. Click "Sign In"
