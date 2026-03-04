@@ -1,14 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const Defect = require('../models/Defect');
-const { protect, authorize } = require('../middlewares/auth');
+const { protect, authorize, restrictViewer } = require('../middlewares/auth');
+const { validateDefectBelongsToTestCase } = require('../middlewares/validateDataIntegrity');
 
 // @route   GET /api/defects
 // @desc    Get all defects
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const { project, status, severity, priority, assignedTo } = req.query;
+        const { project, status, severity, priority, assignedTo, includeArchived } = req.query;
 
         let query = {};
 
@@ -17,6 +18,10 @@ router.get('/', protect, async (req, res) => {
         if (severity) query.severity = severity;
         if (priority) query.priority = priority;
         if (assignedTo) query.assignedTo = assignedTo;
+        // Filter out archived defects unless explicitly requested
+        if (!status && includeArchived !== 'true') {
+            query.status = { $ne: 'archived' };
+        }
 
         const defects = await Defect.find(query)
             .populate('project', 'name')
@@ -77,7 +82,7 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/defects
 // @desc    Create new defect
 // @access  Private (QA Lead, QA Engineer)
-router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateDefectBelongsToTestCase, async (req, res) => {
     try {
         const {
             title,
@@ -133,9 +138,9 @@ router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (r
 // @route   PUT /api/defects/:id
 // @desc    Update defect
 // @access  Private (QA Lead, QA Engineer)
-router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateDefectBelongsToTestCase, async (req, res) => {
     try {
-        let defect = await Defect.findById(req.params.id);
+        const defect = req.defect || await Defect.findById(req.params.id);
 
         if (!defect) {
             return res.status(404).json({
@@ -191,11 +196,11 @@ router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async 
 });
 
 // @route   DELETE /api/defects/:id
-// @desc    Delete defect
+// @desc    Soft delete defect (archive)
 // @access  Private (Admin, QA Lead)
-router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.delete('/:id', protect, restrictViewer, authorize('admin', 'qa_lead'), validateDefectBelongsToTestCase, async (req, res) => {
     try {
-        const defect = await Defect.findById(req.params.id);
+        const defect = req.defect || await Defect.findById(req.params.id);
 
         if (!defect) {
             return res.status(404).json({
@@ -204,17 +209,59 @@ router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) =
             });
         }
 
-        await defect.deleteOne();
+        // Soft delete: change status to 'archived' instead of deleting
+        defect.status = 'archived';
+        await defect.save();
 
         res.status(200).json({
             success: true,
-            message: 'Defect deleted successfully'
+            message: 'Defect archived successfully'
         });
     } catch (error) {
         console.error('Delete defect error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting defect',
+            message: 'Error archiving defect',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/defects/:id/restore
+// @desc    Restore archived defect
+// @access  Private (Admin, QA Lead)
+router.put('/:id/restore', protect, restrictViewer, authorize('admin', 'qa_lead'), validateDefectBelongsToTestCase, async (req, res) => {
+    try {
+        const defect = req.defect || await Defect.findById(req.params.id);
+
+        if (!defect) {
+            return res.status(404).json({
+                success: false,
+                message: 'Defect not found'
+            });
+        }
+
+        // Restore: change status back to 'open'
+        defect.status = 'open';
+        await defect.save();
+
+        const restoredDefect = await Defect.findById(defect._id)
+            .populate('project', 'name')
+            .populate('createdBy', 'name email')
+            .populate('assignedTo', 'name email')
+            .populate('linkedTestCase', 'testCaseId title')
+            .populate('linkedExecution', 'executionId status');
+
+        res.status(200).json({
+            success: true,
+            message: 'Defect restored successfully',
+            data: restoredDefect
+        });
+    } catch (error) {
+        console.error('Restore defect error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error restoring defect',
             error: error.message
         });
     }
@@ -223,7 +270,7 @@ router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) =
 // @route   PUT /api/defects/:id/assign
 // @desc    Assign defect to user
 // @access  Private (Admin, QA Lead)
-router.put('/:id/assign', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.put('/:id/assign', protect, restrictViewer, authorize('admin', 'qa_lead'), async (req, res) => {
     try {
         const defect = await Defect.findById(req.params.id);
 
@@ -264,7 +311,7 @@ router.put('/:id/assign', protect, authorize('admin', 'qa_lead'), async (req, re
 // @route   PUT /api/defects/:id/status
 // @desc    Update defect status
 // @access  Private (QA Lead, QA Engineer)
-router.put('/:id/status', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.put('/:id/status', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
     try {
         const defect = await Defect.findById(req.params.id);
 

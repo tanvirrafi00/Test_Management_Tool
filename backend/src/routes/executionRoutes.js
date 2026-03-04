@@ -1,14 +1,59 @@
 const express = require('express');
 const router = express.Router();
 const Execution = require('../models/Execution');
-const { protect, authorize } = require('../middlewares/auth');
+const Defect = require('../models/Defect');
+const TestCase = require('../models/TestCase');
+const { protect, authorize, restrictViewer } = require('../middlewares/auth');
+const { validateExecutionBelongsToTestPlan } = require('../middlewares/validateDataIntegrity');
+
+/**
+ * Helper function to create a defect from a failed execution
+ * @param {Object} execution - The execution object
+ * @param {Object} user - The user object creating the defect
+ * @returns {Object} - The created defect
+ */
+async function createDefectFromExecution(execution, user) {
+    try {
+        // Fetch the test case to get project and test case details
+        const testCase = await TestCase.findById(execution.testCase);
+        if (!testCase) {
+            throw new Error('Test case not found');
+        }
+
+        // Create defect with pre-filled data from execution
+        const defect = await Defect.create({
+            title: `Failed: ${testCase.title}`,
+            description: `Test execution failed with status: fail\n\nExecution Comments: ${execution.comments || 'No comments provided'}`,
+            stepsToReproduce: testCase.testSteps ? testCase.testSteps.map(step =>
+                `${step.stepNumber}. ${step.action}\n   Expected: ${step.expectedResult}`
+            ).join('\n') : '',
+            severity: testCase.severity || 'major',
+            priority: testCase.priority || 'medium',
+            status: 'open',
+            linkedTestCase: execution.testCase,
+            linkedExecution: execution._id,
+            project: testCase.project,
+            createdBy: user.id,
+            assignedTo: user.id // Assign to the user who executed the test
+        });
+
+        // Update execution to link the created defect
+        execution.linkedDefect = defect._id;
+        await execution.save();
+
+        return defect;
+    } catch (error) {
+        console.error('Error creating defect from execution:', error);
+        throw error;
+    }
+}
 
 // @route   GET /api/executions
 // @desc    Get all executions
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const { testPlan, testCase, status, executedBy } = req.query;
+        const { testPlan, testCase, status, executedBy, includeArchived } = req.query;
 
         let query = {};
 
@@ -16,6 +61,10 @@ router.get('/', protect, async (req, res) => {
         if (testCase) query.testCase = testCase;
         if (status) query.status = status;
         if (executedBy) query.executedBy = executedBy;
+        // Filter out archived executions unless explicitly requested
+        if (!status && includeArchived !== 'true') {
+            query.status = { $ne: 'archived' };
+        }
 
         const executions = await Execution.find(query)
             .populate('testCase', 'title priority')
@@ -72,22 +121,14 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // @route   POST /api/executions
-// @desc    Create new execution
+// @desc    Create new execution (allows multiple executions for same test case/plan for history tracking)
 // @access  Private (QA Lead, QA Engineer)
-router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateExecutionBelongsToTestPlan, async (req, res) => {
     try {
-        const { testCase, testPlan, status, comments, linkedDefect } = req.body;
+        const { testCase, testPlan, status, comments, linkedDefect, createDefect } = req.body;
 
-        // Check if execution already exists for this test case and test plan
-        const existingExecution = await Execution.findOne({ testCase, testPlan });
-
-        if (existingExecution) {
-            return res.status(400).json({
-                success: false,
-                message: 'Execution already exists for this test case in the test plan'
-            });
-        }
-
+        // Create new execution record - allows multiple executions for same test case/plan
+        // This enables re-execution and history tracking as per spec requirements
         const execution = await Execution.create({
             testCase,
             testPlan,
@@ -97,17 +138,39 @@ router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (r
             linkedDefect
         });
 
+        // Automatic defect creation on fail status if createDefect flag is true
+        let createdDefect = null;
+        if (status === 'fail' && createDefect === true) {
+            try {
+                createdDefect = await createDefectFromExecution(execution, req.user);
+                console.log(`Defect created automatically for execution ${execution.executionId}: ${createdDefect.defectId}`);
+            } catch (defectError) {
+                console.error('Automatic defect creation failed:', defectError);
+                // Continue with execution creation even if defect creation fails
+                // Log the error but don't fail the entire operation
+            }
+        }
+
         const populatedExecution = await Execution.findById(execution._id)
             .populate('testCase', 'title priority')
             .populate('testPlan', 'name')
             .populate('executedBy', 'name email')
             .populate('linkedDefect', 'defectId title status');
 
-        res.status(201).json({
+        const response = {
             success: true,
             message: 'Execution created successfully',
             data: populatedExecution
-        });
+        };
+
+        // Include defect creation info in response
+        if (createdDefect) {
+            response.defectCreated = true;
+            response.defectId = createdDefect._id;
+            response.defectDefectId = createdDefect.defectId;
+        }
+
+        res.status(201).json(response);
     } catch (error) {
         console.error('Create execution error:', error);
         res.status(500).json({
@@ -121,9 +184,9 @@ router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (r
 // @route   PUT /api/executions/:id
 // @desc    Update execution
 // @access  Private (QA Lead, QA Engineer)
-router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateExecutionBelongsToTestPlan, async (req, res) => {
     try {
-        let execution = await Execution.findById(req.params.id);
+        const execution = req.execution || await Execution.findById(req.params.id);
 
         if (!execution) {
             return res.status(404).json({
@@ -132,7 +195,7 @@ router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async 
             });
         }
 
-        const { status, comments, linkedDefect } = req.body;
+        const { status, comments, linkedDefect, createDefect } = req.body;
 
         if (status) execution.status = status;
         if (comments !== undefined) execution.comments = comments;
@@ -145,17 +208,39 @@ router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async 
 
         await execution.save();
 
+        // Automatic defect creation on fail status if createDefect flag is true
+        let createdDefect = null;
+        if (status === 'fail' && createDefect === true && !execution.linkedDefect) {
+            try {
+                createdDefect = await createDefectFromExecution(execution, req.user);
+                console.log(`Defect created automatically for execution ${execution.executionId}: ${createdDefect.defectId}`);
+            } catch (defectError) {
+                console.error('Automatic defect creation failed:', defectError);
+                // Continue with execution update even if defect creation fails
+                // Log the error but don't fail the entire operation
+            }
+        }
+
         const updatedExecution = await Execution.findById(execution._id)
             .populate('testCase', 'title priority')
             .populate('testPlan', 'name')
             .populate('executedBy', 'name email')
             .populate('linkedDefect', 'defectId title status');
 
-        res.status(200).json({
+        const response = {
             success: true,
             message: 'Execution updated successfully',
             data: updatedExecution
-        });
+        };
+
+        // Include defect creation info in response
+        if (createdDefect) {
+            response.defectCreated = true;
+            response.defectId = createdDefect._id;
+            response.defectDefectId = createdDefect.defectId;
+        }
+
+        res.status(200).json(response);
     } catch (error) {
         console.error('Update execution error:', error);
         res.status(500).json({
@@ -167,11 +252,11 @@ router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async 
 });
 
 // @route   DELETE /api/executions/:id
-// @desc    Delete execution
+// @desc    Soft delete execution (archive)
 // @access  Private (Admin, QA Lead)
-router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.delete('/:id', protect, restrictViewer, authorize('admin', 'qa_lead'), validateExecutionBelongsToTestPlan, async (req, res) => {
     try {
-        const execution = await Execution.findById(req.params.id);
+        const execution = req.execution || await Execution.findById(req.params.id);
 
         if (!execution) {
             return res.status(404).json({
@@ -180,17 +265,58 @@ router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) =
             });
         }
 
-        await execution.deleteOne();
+        // Soft delete: change status to 'archived' instead of deleting
+        execution.status = 'archived';
+        await execution.save();
 
         res.status(200).json({
             success: true,
-            message: 'Execution deleted successfully'
+            message: 'Execution archived successfully'
         });
     } catch (error) {
         console.error('Delete execution error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting execution',
+            message: 'Error archiving execution',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/executions/:id/restore
+// @desc    Restore archived execution
+// @access  Private (Admin, QA Lead)
+router.put('/:id/restore', protect, restrictViewer, authorize('admin', 'qa_lead'), validateExecutionBelongsToTestPlan, async (req, res) => {
+    try {
+        const execution = req.execution || await Execution.findById(req.params.id);
+
+        if (!execution) {
+            return res.status(404).json({
+                success: false,
+                message: 'Execution not found'
+            });
+        }
+
+        // Restore: change status back to 'not_run'
+        execution.status = 'not_run';
+        await execution.save();
+
+        const restoredExecution = await Execution.findById(execution._id)
+            .populate('testCase', 'title priority')
+            .populate('testPlan', 'name')
+            .populate('executedBy', 'name email')
+            .populate('linkedDefect', 'defectId title status');
+
+        res.status(200).json({
+            success: true,
+            message: 'Execution restored successfully',
+            data: restoredExecution
+        });
+    } catch (error) {
+        console.error('Restore execution error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error restoring execution',
             error: error.message
         });
     }

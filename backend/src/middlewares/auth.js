@@ -6,8 +6,12 @@ const protect = async (req, res, next) => {
     try {
         let token;
 
-        // Check for token in Authorization header
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        // Check for token in cookie first (HttpOnly cookie)
+        if (req.cookies && req.cookies.token) {
+            token = req.cookies.token;
+        }
+        // Fallback to Authorization header for backward compatibility
+        else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
             token = req.headers.authorization.split(' ')[1];
         }
 
@@ -67,4 +71,15 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { protect, authorize };
+// Restrict Viewer role from modifying data (POST, PUT, DELETE)
+const restrictViewer = (req, res, next) => {
+    if (req.user.role === 'viewer' && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Viewer role has read-only access and cannot modify data'
+        });
+    }
+    next();
+};
+
+module.exports = { protect, authorize, restrictViewer };

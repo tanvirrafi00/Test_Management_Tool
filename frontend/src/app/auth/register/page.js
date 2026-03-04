@@ -15,7 +15,6 @@ export default function Register() {
         email: '',
         password: '',
         confirmPassword: '',
-        role: 'qa_engineer',
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -44,7 +43,7 @@ export default function Register() {
 
         setLoading(true);
 
-        const result = await register(formData.name, formData.email, formData.password, formData.role);
+        const result = await register(formData.name, formData.email, formData.password);
 
         if (result.success) {
             router.push('/dashboard');
@@ -119,26 +118,6 @@ export default function Register() {
                                     hasIcon={true}
                                 />
                             </div>
-                        </div>
-
-                        {/* Role Field */}
-                        <div>
-                            <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                                Role
-                            </label>
-                            <select
-                                id="role"
-                                name="role"
-                                value={formData.role}
-                                onChange={handleChange}
-                                disabled={loading}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            >
-                                <option value="qa_engineer">QA Engineer</option>
-                                <option value="qa_lead">QA Lead</option>
-                                <option value="viewer">Viewer</option>
-                                <option value="admin">Admin</option>
-                            </select>
                         </div>
 
                         {/* Password Field */}

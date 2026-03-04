@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const testPlanSchema = new mongoose.Schema({
     planId: {
         type: String,
-        unique: true,
-        required: true
+        unique: true
     },
     name: {
         type: String,

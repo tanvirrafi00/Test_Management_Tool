@@ -8,6 +8,7 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true, // Include cookies in requests
 });
 
 // Add token to requests
@@ -41,9 +42,12 @@ api.interceptors.response.use(
 export const authAPI = {
     register: (data) => api.post('/auth/register', data),
     login: (data) => api.post('/auth/login', data),
+    logout: () => api.post('/auth/logout'),
     getMe: () => api.get('/auth/me'),
     updateProfile: (data) => api.put('/auth/updateprofile', data),
     changePassword: (data) => api.put('/auth/changepassword', data),
+    getUsers: () => api.get('/auth/users'),
+    updateUserRole: (id, data) => api.put(`/auth/users/${id}/role`, data),
 };
 
 // Projects API

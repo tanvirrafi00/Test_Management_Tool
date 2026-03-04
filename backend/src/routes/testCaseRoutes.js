@@ -1,20 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const TestCase = require('../models/TestCase');
-const { protect, authorize } = require('../middlewares/auth');
+const { protect, authorize, restrictViewer } = require('../middlewares/auth');
+const { validateTestCaseBelongsToProject } = require('../middlewares/validateDataIntegrity');
 
 // @route   GET /api/testcases
 // @desc    Get all test cases
 // @access  Private
 router.get('/', protect, async (req, res) => {
   try {
-    const { project, priority, status, search } = req.query;
-    
+    const { project, priority, status, search, includeDeprecated } = req.query;
+
     let query = {};
-    
+
     if (project) query.project = project;
     if (priority) query.priority = priority;
     if (status) query.status = status;
+    // Filter out deprecated test cases unless explicitly requested
+    if (!status && includeDeprecated !== 'true') {
+      query.status = { $ne: 'deprecated' };
+    }
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -77,7 +82,7 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/testcases
 // @desc    Create new test case
 // @access  Private (QA Lead, QA Engineer)
-router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateTestCaseBelongsToProject, async (req, res) => {
   try {
     const {
       title,
@@ -129,9 +134,9 @@ router.post('/', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (r
 // @route   PUT /api/testcases/:id
 // @desc    Update test case
 // @access  Private (QA Lead, QA Engineer)
-router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateTestCaseBelongsToProject, async (req, res) => {
   try {
-    let testCase = await TestCase.findById(req.params.id);
+    const testCase = req.testCase || await TestCase.findById(req.params.id);
 
     if (!testCase) {
       return res.status(404).json({
@@ -188,11 +193,11 @@ router.put('/:id', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async 
 });
 
 // @route   DELETE /api/testcases/:id
-// @desc    Delete test case
+// @desc    Soft delete test case (mark as deprecated)
 // @access  Private (Admin, QA Lead)
-router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.delete('/:id', protect, restrictViewer, authorize('admin', 'qa_lead'), validateTestCaseBelongsToProject, async (req, res) => {
   try {
-    const testCase = await TestCase.findById(req.params.id);
+    const testCase = req.testCase || await TestCase.findById(req.params.id);
 
     if (!testCase) {
       return res.status(404).json({
@@ -201,17 +206,57 @@ router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) =
       });
     }
 
-    await testCase.deleteOne();
+    // Soft delete: change status to 'deprecated' instead of deleting
+    testCase.status = 'deprecated';
+    await testCase.save();
 
     res.status(200).json({
       success: true,
-      message: 'Test case deleted successfully'
+      message: 'Test case deprecated successfully'
     });
   } catch (error) {
     console.error('Delete test case error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting test case',
+      message: 'Error deprecating test case',
+      error: error.message
+    });
+  }
+});
+
+// @route   PUT /api/testcases/:id/restore
+// @desc    Restore deprecated test case
+// @access  Private (Admin, QA Lead)
+router.put('/:id/restore', protect, restrictViewer, authorize('admin', 'qa_lead'), validateTestCaseBelongsToProject, async (req, res) => {
+  try {
+    const testCase = req.testCase || await TestCase.findById(req.params.id);
+
+    if (!testCase) {
+      return res.status(404).json({
+        success: false,
+        message: 'Test case not found'
+      });
+    }
+
+    // Restore: change status back to 'ready'
+    testCase.status = 'ready';
+    await testCase.save();
+
+    const restoredTestCase = await TestCase.findById(testCase._id)
+      .populate('project', 'name')
+      .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email');
+
+    res.status(200).json({
+      success: true,
+      message: 'Test case restored successfully',
+      data: restoredTestCase
+    });
+  } catch (error) {
+    console.error('Restore test case error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error restoring test case',
       error: error.message
     });
   }
@@ -220,7 +265,7 @@ router.delete('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) =
 // @route   POST /api/testcases/:id/clone
 // @desc    Clone test case
 // @access  Private (QA Lead, QA Engineer)
-router.post('/:id/clone', protect, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+router.post('/:id/clone', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
   try {
     const originalTestCase = await TestCase.findById(req.params.id);
 

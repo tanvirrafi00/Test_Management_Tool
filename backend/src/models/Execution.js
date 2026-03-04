@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const executionSchema = new mongoose.Schema({
     executionId: {
         type: String,
-        unique: true,
-        required: true
+        unique: true
     },
     testCase: {
         type: mongoose.Schema.Types.ObjectId,
@@ -23,7 +22,7 @@ const executionSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['not_run', 'pass', 'fail', 'blocked', 'retest'],
+        enum: ['not_run', 'pass', 'fail', 'blocked', 'retest', 'archived'],
         default: 'not_run'
     },
     comments: {

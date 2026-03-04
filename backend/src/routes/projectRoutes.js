@@ -1,14 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
-const { protect, authorize } = require('../middlewares/auth');
+const { protect, authorize, restrictViewer } = require('../middlewares/auth');
+const { validateCreatorOrAdmin } = require('../middlewares/validateDataIntegrity');
 
 // @route   GET /api/projects
 // @desc    Get all projects
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const projects = await Project.find()
+        const { includeArchived } = req.query;
+
+        let query = {};
+        // Filter out archived projects unless explicitly requested
+        if (includeArchived !== 'true') {
+            query.status = { $ne: 'archived' };
+        }
+
+        const projects = await Project.find(query)
             .populate('createdBy', 'name email')
             .populate('teamMembers', 'name email role')
             .sort({ createdAt: -1 });
@@ -61,7 +70,7 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/projects
 // @desc    Create new project
 // @access  Private (Admin, QA Lead)
-router.post('/', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead'), async (req, res) => {
     try {
         const { name, description, teamMembers } = req.body;
 
@@ -94,16 +103,9 @@ router.post('/', protect, authorize('admin', 'qa_lead'), async (req, res) => {
 // @route   PUT /api/projects/:id
 // @desc    Update project
 // @access  Private (Admin, QA Lead)
-router.put('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead'), validateCreatorOrAdmin('id', Project), async (req, res) => {
     try {
-        let project = await Project.findById(req.params.id);
-
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: 'Project not found'
-            });
-        }
+        const project = req.entity;
 
         const { name, description, status, teamMembers } = req.body;
 
@@ -134,30 +136,55 @@ router.put('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
 });
 
 // @route   DELETE /api/projects/:id
-// @desc    Delete project
+// @desc    Soft delete project (archive)
 // @access  Private (Admin)
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, restrictViewer, authorize('admin'), validateCreatorOrAdmin('id', Project), async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id);
+        const project = req.entity;
 
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: 'Project not found'
-            });
-        }
-
-        await project.deleteOne();
+        // Soft delete: change status to 'archived' instead of deleting
+        project.status = 'archived';
+        await project.save();
 
         res.status(200).json({
             success: true,
-            message: 'Project deleted successfully'
+            message: 'Project archived successfully'
         });
     } catch (error) {
         console.error('Delete project error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting project',
+            message: 'Error archiving project',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/projects/:id/restore
+// @desc    Restore archived project
+// @access  Private (Admin)
+router.put('/:id/restore', protect, restrictViewer, authorize('admin'), validateCreatorOrAdmin('id', Project), async (req, res) => {
+    try {
+        const project = req.entity;
+
+        // Restore: change status back to 'active'
+        project.status = 'active';
+        await project.save();
+
+        const restoredProject = await Project.findById(project._id)
+            .populate('createdBy', 'name email')
+            .populate('teamMembers', 'name email role');
+
+        res.status(200).json({
+            success: true,
+            message: 'Project restored successfully',
+            data: restoredProject
+        });
+    } catch (error) {
+        console.error('Restore project error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error restoring project',
             error: error.message
         });
     }
@@ -166,16 +193,9 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
 // @route   POST /api/projects/:id/members
 // @desc    Add team member to project
 // @access  Private (Admin, QA Lead)
-router.post('/:id/members', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.post('/:id/members', protect, restrictViewer, authorize('admin', 'qa_lead'), validateCreatorOrAdmin('id', Project), async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id);
-
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: 'Project not found'
-            });
-        }
+        const project = req.entity;
 
         const { userId } = req.body;
 
@@ -206,16 +226,9 @@ router.post('/:id/members', protect, authorize('admin', 'qa_lead'), async (req, 
 // @route   DELETE /api/projects/:id/members/:userId
 // @desc    Remove team member from project
 // @access  Private (Admin, QA Lead)
-router.delete('/:id/members/:userId', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.delete('/:id/members/:userId', protect, restrictViewer, authorize('admin', 'qa_lead'), validateCreatorOrAdmin('id', Project), async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id);
-
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: 'Project not found'
-            });
-        }
+        const project = req.entity;
 
         project.teamMembers = project.teamMembers.filter(
             member => member.toString() !== req.params.userId
@@ -242,3 +255,4 @@ router.delete('/:id/members/:userId', protect, authorize('admin', 'qa_lead'), as
 });
 
 module.exports = router;
+

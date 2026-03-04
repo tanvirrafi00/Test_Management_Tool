@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const testCaseSchema = new mongoose.Schema({
     testCaseId: {
         type: String,
-        unique: true,
-        required: true
+        unique: true
     },
     title: {
         type: String,

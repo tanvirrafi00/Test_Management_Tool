@@ -1,19 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const TestPlan = require('../models/TestPlan');
-const { protect, authorize } = require('../middlewares/auth');
+const { protect, authorize, restrictViewer } = require('../middlewares/auth');
+const { validateTestPlanBelongsToProject, validateTestCasesBelongToProject } = require('../middlewares/validateDataIntegrity');
 
 // @route   GET /api/testplans
 // @desc    Get all test plans
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const { project, status } = req.query;
+        const { project, status, includeCancelled } = req.query;
 
         let query = {};
 
         if (project) query.project = project;
         if (status) query.status = status;
+        // Filter out cancelled test plans unless explicitly requested
+        if (!status && includeCancelled !== 'true') {
+            query.status = { $ne: 'cancelled' };
+        }
 
         const testPlans = await TestPlan.find(query)
             .populate('project', 'name')
@@ -72,7 +77,7 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/testplans
 // @desc    Create new test plan
 // @access  Private (Admin, QA Lead)
-router.post('/', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead'), validateTestPlanBelongsToProject, async (req, res) => {
     try {
         const {
             name,
@@ -121,9 +126,9 @@ router.post('/', protect, authorize('admin', 'qa_lead'), async (req, res) => {
 // @route   PUT /api/testplans/:id
 // @desc    Update test plan
 // @access  Private (Admin, QA Lead)
-router.put('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead'), validateTestPlanBelongsToProject, async (req, res) => {
     try {
-        let testPlan = await TestPlan.findById(req.params.id);
+        const testPlan = req.testPlan || await TestPlan.findById(req.params.id);
 
         if (!testPlan) {
             return res.status(404).json({
@@ -174,11 +179,11 @@ router.put('/:id', protect, authorize('admin', 'qa_lead'), async (req, res) => {
 });
 
 // @route   DELETE /api/testplans/:id
-// @desc    Delete test plan
+// @desc    Soft delete test plan (mark as cancelled)
 // @access  Private (Admin)
-router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+router.delete('/:id', protect, restrictViewer, authorize('admin'), validateTestPlanBelongsToProject, async (req, res) => {
     try {
-        const testPlan = await TestPlan.findById(req.params.id);
+        const testPlan = req.testPlan || await TestPlan.findById(req.params.id);
 
         if (!testPlan) {
             return res.status(404).json({
@@ -187,17 +192,58 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
             });
         }
 
-        await testPlan.deleteOne();
+        // Soft delete: change status to 'cancelled' instead of deleting
+        testPlan.status = 'cancelled';
+        await testPlan.save();
 
         res.status(200).json({
             success: true,
-            message: 'Test plan deleted successfully'
+            message: 'Test plan cancelled successfully'
         });
     } catch (error) {
         console.error('Delete test plan error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error deleting test plan',
+            message: 'Error cancelling test plan',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/testplans/:id/restore
+// @desc    Restore cancelled test plan
+// @access  Private (Admin)
+router.put('/:id/restore', protect, restrictViewer, authorize('admin'), validateTestPlanBelongsToProject, async (req, res) => {
+    try {
+        const testPlan = req.testPlan || await TestPlan.findById(req.params.id);
+
+        if (!testPlan) {
+            return res.status(404).json({
+                success: false,
+                message: 'Test plan not found'
+            });
+        }
+
+        // Restore: change status back to 'active'
+        testPlan.status = 'active';
+        await testPlan.save();
+
+        const restoredTestPlan = await TestPlan.findById(testPlan._id)
+            .populate('project', 'name')
+            .populate('createdBy', 'name email')
+            .populate('assignedTesters', 'name email')
+            .populate('testCases', 'title priority status');
+
+        res.status(200).json({
+            success: true,
+            message: 'Test plan restored successfully',
+            data: restoredTestPlan
+        });
+    } catch (error) {
+        console.error('Restore test plan error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error restoring test plan',
             error: error.message
         });
     }
@@ -206,7 +252,7 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
 // @route   POST /api/testplans/:id/testcases
 // @desc    Add test cases to test plan
 // @access  Private (Admin, QA Lead)
-router.post('/:id/testcases', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.post('/:id/testcases', protect, restrictViewer, authorize('admin', 'qa_lead'), validateTestCasesBelongToProject, async (req, res) => {
     try {
         const testPlan = await TestPlan.findById(req.params.id);
 
@@ -251,7 +297,7 @@ router.post('/:id/testcases', protect, authorize('admin', 'qa_lead'), async (req
 // @route   DELETE /api/testplans/:id/testcases/:testCaseId
 // @desc    Remove test case from test plan
 // @access  Private (Admin, QA Lead)
-router.delete('/:id/testcases/:testCaseId', protect, authorize('admin', 'qa_lead'), async (req, res) => {
+router.delete('/:id/testcases/:testCaseId', protect, restrictViewer, authorize('admin', 'qa_lead'), async (req, res) => {
     try {
         const testPlan = await TestPlan.findById(req.params.id);
 

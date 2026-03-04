@@ -8,23 +8,26 @@ export function useAuth() {
     const router = useRouter();
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
+        // Fetch user data from backend to verify authentication
+        const fetchUser = async () => {
+            try {
+                const response = await authAPI.getMe();
+                setUser(response.data.data);
+            } catch (error) {
+                // User is not authenticated, clear any stored data
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        if (token && storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
-
-        setLoading(false);
+        fetchUser();
     }, []);
 
     const login = async (email, password) => {
         try {
             const response = await authAPI.login({ email, password });
-            const { user, token } = response.data.data;
-
-            localStorage.setItem('token', token);
-            localStorage.setItem('user', JSON.stringify(user));
+            const { user } = response.data.data;
             setUser(user);
 
             return { success: true };
@@ -36,13 +39,10 @@ export function useAuth() {
         }
     };
 
-    const register = async (name, email, password, role) => {
+    const register = async (name, email, password) => {
         try {
-            const response = await authAPI.register({ name, email, password, role });
-            const { user, token } = response.data.data;
-
-            localStorage.setItem('token', token);
-            localStorage.setItem('user', JSON.stringify(user));
+            const response = await authAPI.register({ name, email, password });
+            const { user } = response.data.data;
             setUser(user);
 
             return { success: true };
@@ -54,16 +54,20 @@ export function useAuth() {
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
-        router.push('/auth/login');
+    const logout = async () => {
+        try {
+            await authAPI.logout();
+            setUser(null);
+            router.push('/auth/login');
+        } catch (error) {
+            // Even if logout fails, clear user state and redirect
+            setUser(null);
+            router.push('/auth/login');
+        }
     };
 
     const updateUser = (updatedUser) => {
         setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
     };
 
     return {

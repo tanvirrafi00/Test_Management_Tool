@@ -14,22 +14,63 @@ import {
     Menu,
     X,
     User,
-    ChevronRight
+    ChevronRight,
+    Users
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../hooks/useAuth';
 
 export default function DashboardLayout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
+    const { user, loading, logout } = useAuth();
+    const userRole = user?.role;
 
-    const navigation = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-        { name: 'Projects', href: '/projects', icon: FolderKanban },
-        { name: 'Test Cases', href: '/test-cases', icon: FileText },
-        { name: 'Test Plans', href: '/test-plans', icon: ClipboardList },
-        { name: 'Executions', href: '/executions', icon: PlayCircle },
-        { name: 'Defects', href: '/defects', icon: AlertTriangle },
-    ];
+    // Define navigation items based on user role
+    const getNavigationByRole = (role) => {
+        const commonItems = [
+            { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        ];
+
+        if (role === 'admin') {
+            return [
+                ...commonItems,
+                { name: 'Projects', href: '/projects', icon: FolderKanban },
+                { name: 'Test Cases', href: '/test-cases', icon: FileText },
+                { name: 'Test Plans', href: '/test-plans', icon: ClipboardList },
+                { name: 'Executions', href: '/executions', icon: PlayCircle },
+                { name: 'Defects', href: '/defects', icon: AlertTriangle },
+                { name: 'Users', href: '/admin/users', icon: Users },
+            ];
+        }
+
+        if (role === 'qa_lead' || role === 'qa_engineer') {
+            return [
+                ...commonItems,
+                { name: 'Projects', href: '/projects', icon: FolderKanban },
+                { name: 'Test Cases', href: '/test-cases', icon: FileText },
+                { name: 'Test Plans', href: '/test-plans', icon: ClipboardList },
+                { name: 'Executions', href: '/executions', icon: PlayCircle },
+                { name: 'Defects', href: '/defects', icon: AlertTriangle },
+            ];
+        }
+
+        if (role === 'viewer') {
+            return [
+                ...commonItems,
+                { name: 'Projects', href: '/projects', icon: FolderKanban },
+                { name: 'Test Cases', href: '/test-cases', icon: FileText },
+                { name: 'Test Plans', href: '/test-plans', icon: ClipboardList },
+                { name: 'Executions', href: '/executions', icon: PlayCircle },
+                { name: 'Defects', href: '/defects', icon: AlertTriangle },
+            ];
+        }
+
+        return commonItems;
+    };
+
+    // Get navigation items based on user role
+    const navigation = getNavigationByRole(userRole);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -92,26 +133,38 @@ export default function DashboardLayout({ children }) {
 
                     {/* User Profile Section */}
                     <div className="absolute bottom-0 left-0 right-0 w-full border-t border-gray-200 p-4">
-                        <div className="flex items-center mb-3">
-                            <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                                <User className="h-6 w-6 text-primary-600" />
+                        {loading ? (
+                            <div className="flex items-center">
+                                <div className="h-10 w-10 rounded-full bg-gray-100 animate-pulse"></div>
+                                <div className="ml-3 flex-1">
+                                    <div className="h-4 bg-gray-100 rounded animate-pulse mb-2"></div>
+                                    <div className="h-3 bg-gray-100 rounded animate-pulse w-2/3"></div>
+                                </div>
                             </div>
-                            <div className="ml-3">
-                                <p className="text-sm font-medium text-gray-900">John Doe</p>
-                                <p className="text-xs text-gray-500 capitalize">QA Lead</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => {
-                                localStorage.removeItem('token');
-                                localStorage.removeItem('user');
-                                window.location.href = '/auth/login';
-                            }}
-                            className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                        >
-                            <LogOut className="h-5 w-5 mr-2" />
-                            Logout
-                        </button>
+                        ) : user ? (
+                            <>
+                                <div className="flex items-center mb-3">
+                                    <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                                        <User className="h-6 w-6 text-primary-600" />
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="text-sm font-medium text-gray-900">{user.name || 'User'}</p>
+                                        <p className="text-xs text-gray-500 capitalize">
+                                            {userRole?.replace('_', ' ') || 'Guest'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={logout}
+                                    className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                                >
+                                    <LogOut className="h-5 w-5 mr-2" />
+                                    Logout
+                                </button>
+                            </>
+                        ) : (
+                            <div className="text-sm text-gray-500">Not authenticated</div>
+                        )}
                     </div>
                 </aside>
 
@@ -124,7 +177,9 @@ export default function DashboardLayout({ children }) {
                             <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
                                 <User className="h-5 w-5 text-primary-600" />
                             </div>
-                            <span className="text-sm text-gray-600">John Doe</span>
+                            <span className="text-sm text-gray-600">
+                                {loading ? 'Loading...' : user?.name || 'User'}
+                            </span>
                         </div>
                     </div>
 

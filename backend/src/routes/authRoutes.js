@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const generateToken = require('../utils/jwtUtils');
-const { protect } = require('../middlewares/auth');
+const { protect, authorize } = require('../middlewares/auth');
 
 // @route   POST /api/auth/register
 // @desc    Register a new user
@@ -31,12 +31,19 @@ router.post('/register', async (req, res) => {
         // Generate token
         const token = generateToken(user._id);
 
+        // Send token in HttpOnly cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
+
         res.status(201).json({
             success: true,
             message: 'User registered successfully',
             data: {
-                user,
-                token
+                user
             }
         });
     } catch (error) {
@@ -97,12 +104,19 @@ router.post('/login', async (req, res) => {
         // Generate token
         const token = generateToken(user._id);
 
+        // Send token in HttpOnly cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+        });
+
         res.status(200).json({
             success: true,
             message: 'Login successful',
             data: {
-                user,
-                token
+                user
             }
         });
     } catch (error) {
@@ -131,6 +145,32 @@ router.get('/me', protect, async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error fetching user data',
+            error: error.message
+        });
+    }
+});
+
+// @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Private
+router.post('/logout', protect, async (req, res) => {
+    try {
+        // Clear the HttpOnly cookie
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Logout successful'
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error logging out',
             error: error.message
         });
     }
@@ -197,6 +237,83 @@ router.put('/changepassword', protect, async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error changing password',
+            error: error.message
+        });
+    }
+});
+
+// @route   GET /api/auth/users
+// @desc    Get all users
+// @access  Private (Admin only)
+router.get('/users', protect, authorize('admin'), async (req, res) => {
+    try {
+        const users = await User.find()
+            .select('-password')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users
+        });
+    } catch (error) {
+        console.error('Get users error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching users',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/auth/users/:id/role
+// @desc    Update user role
+// @access  Private (Admin only)
+router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { role } = req.body;
+
+        // Validate role
+        const validRoles = ['admin', 'qa_lead', 'qa_engineer', 'viewer'];
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid role'
+            });
+        }
+
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Prevent admin from changing their own role
+        if (user._id.toString() === req.user.id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot change your own role'
+            });
+        }
+
+        user.role = role;
+        await user.save();
+
+        const updatedUser = await User.findById(user._id).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: 'User role updated successfully',
+            data: updatedUser
+        });
+    } catch (error) {
+        console.error('Update user role error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating user role',
             error: error.message
         });
     }

@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const defectSchema = new mongoose.Schema({
     defectId: {
         type: String,
-        unique: true,
-        required: true
+        unique: true
     },
     title: {
         type: String,
@@ -43,7 +42,7 @@ const defectSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['open', 'in_progress', 'fixed', 'retest', 'closed'],
+        enum: ['open', 'in_progress', 'fixed', 'retest', 'closed', 'archived'],
         default: 'open'
     },
     assignedTo: {
