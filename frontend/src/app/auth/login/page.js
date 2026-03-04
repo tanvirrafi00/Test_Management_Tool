@@ -16,6 +16,7 @@ export default function Login() {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e) => {
         setFormData({
@@ -26,17 +27,27 @@ export default function Login() {
     };
 
     const handleSubmit = async (e) => {
+        // Prevent double submission
+        if (isSubmitting) {
+            return;
+        }
+
         e.preventDefault();
         setError('');
         setLoading(true);
+        setIsSubmitting(true);
 
-        const result = await login(formData.email, formData.password);
+        try {
+            const result = await login(formData.email, formData.password);
 
-        if (result.success) {
-            router.push('/dashboard');
-        } else {
-            setError(result.message);
+            if (result.success) {
+                router.push('/dashboard');
+            } else {
+                setError(result.message);
+            }
+        } finally {
             setLoading(false);
+            setIsSubmitting(false);
         }
     };
 
