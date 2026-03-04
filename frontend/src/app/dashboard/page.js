@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
-import { dashboardAPI } from '@/lib/api';
-import { 
-  FolderKanban, 
-  FileText, 
-  ClipboardList, 
-  PlayCircle, 
+import DashboardLayout from '../../components/DashboardLayout';
+import { dashboardAPI } from '../../lib/api';
+import {
+  FolderKanban,
+  FileText,
+  ClipboardList,
+  PlayCircle,
   AlertTriangle,
   TrendingUp,
   CheckCircle,

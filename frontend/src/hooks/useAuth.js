@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { authAPI } from '@/lib/api';
+import { authAPI } from '../lib/api';
 import { useRouter } from 'next/navigation';
 
 export function useAuth() {
