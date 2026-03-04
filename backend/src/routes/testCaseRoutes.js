@@ -3,6 +3,7 @@ const router = express.Router();
 const TestCase = require('../models/TestCase');
 const { protect, authorize, restrictViewer } = require('../middlewares/auth');
 const { validateTestCaseBelongsToProject } = require('../middlewares/validateDataIntegrity');
+const { getTestCaseFilter } = require('../utils/roleBasedFilter');
 
 // @route   GET /api/testcases
 // @desc    Get all test cases
@@ -12,6 +13,13 @@ router.get('/', protect, async (req, res) => {
     const { project, priority, status, search, includeDeprecated } = req.query;
 
     let query = {};
+
+    // Apply role-based filtering
+    try {
+      query = await getTestCaseFilter(req.user, {});
+    } catch (err) {
+      return res.status(403).json({ success: false, message: err.message });
+    }
 
     if (project) query.project = project;
     if (priority) query.priority = priority;
@@ -63,6 +71,48 @@ router.get('/:id', protect, async (req, res) => {
         success: false,
         message: 'Test case not found'
       });
+    }
+
+    // Check if user has access to this test case based on role
+    try {
+      const filter = await getTestCaseFilter(req.user, {});
+      if (filter._id === null) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to test cases'
+        });
+      }
+      
+      // For QA roles, check if they have access to this specific test case
+      if (req.user.role !== 'admin' && req.user.role !== 'product_manager') {
+        if (req.user.role === 'qa_lead') {
+          // QA Lead can access test cases in their projects
+          const Project = require('../models/Project');
+          const userProjects = await Project.find({ teamMembers: req.user._id }).select('_id');
+          const projectIds = userProjects.map(p => p._id);
+          if (!projectIds.some(id => id.toString() === testCase.project.toString())) {
+            return res.status(403).json({
+              success: false,
+              message: 'Access denied to this test case'
+            });
+          }
+        } else if (req.user.role === 'qa_engineer' || req.user.role === 'qa_automation') {
+          // QA Engineers can only access test cases assigned to them or created by them
+          if (testCase.assignedTo?.toString() !== req.user.id && testCase.createdBy?.toString() !== req.user.id) {
+            return res.status(403).json({
+              success: false,
+              message: 'Access denied to this test case'
+            });
+          }
+        } else if (req.user.role === 'developer') {
+          return res.status(403).json({
+            success: false,
+            message: 'Developers cannot access test cases'
+          });
+        }
+      }
+    } catch (err) {
+      return res.status(403).json({ success: false, message: err.message });
     }
 
     res.status(200).json({

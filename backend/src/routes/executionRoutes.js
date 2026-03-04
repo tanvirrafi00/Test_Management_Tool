@@ -5,6 +5,7 @@ const Defect = require('../models/Defect');
 const TestCase = require('../models/TestCase');
 const { protect, authorize, restrictViewer } = require('../middlewares/auth');
 const { validateExecutionBelongsToTestPlan } = require('../middlewares/validateDataIntegrity');
+const { getExecutionFilter } = require('../utils/roleBasedFilter');
 
 /**
  * Helper function to create a defect from a failed execution
@@ -57,6 +58,13 @@ router.get('/', protect, async (req, res) => {
 
         let query = {};
 
+        // Apply role-based filtering
+        try {
+            query = await getExecutionFilter(req.user, {});
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
+
         if (testPlan) query.testPlan = testPlan;
         if (testCase) query.testCase = testCase;
         if (status) query.status = status;
@@ -106,6 +114,59 @@ router.get('/:id', protect, async (req, res) => {
             });
         }
 
+        // Check if user has access to this execution based on role
+        try {
+            const filter = await getExecutionFilter(req.user, {});
+            if (filter._id === null) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied to executions'
+                });
+            }
+
+            // For QA roles, check if they have access to this specific execution
+            if (req.user.role !== 'admin' && req.user.role !== 'product_manager') {
+                if (req.user.role === 'qa_lead') {
+                    // QA Lead can access executions in their projects
+                    const Project = require('../models/Project');
+                    const TestCase = require('../models/TestCase');
+                    const TestPlan = require('../models/TestPlan');
+
+                    const testCase = await TestCase.findById(execution.testCase);
+                    const testPlan = await TestPlan.findById(execution.testPlan);
+
+                    const userProjects = await Project.find({ teamMembers: req.user._id }).select('_id');
+                    const projectIds = userProjects.map(p => p._id);
+
+                    const testCaseProject = testCase?.project?.toString();
+                    const testPlanProject = testPlan?.project?.toString();
+
+                    if (!projectIds.some(id => id.toString() === testCaseProject) &&
+                        !projectIds.some(id => id.toString() === testPlanProject)) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this execution'
+                        });
+                    }
+                } else if (req.user.role === 'qa_engineer' || req.user.role === 'qa_automation') {
+                    // QA Engineers can only access executions they performed
+                    if (execution.executedBy?.toString() !== req.user.id) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this execution'
+                        });
+                    }
+                } else if (req.user.role === 'developer') {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Developers cannot access executions'
+                    });
+                }
+            }
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
+
         res.status(200).json({
             success: true,
             data: execution
@@ -122,16 +183,26 @@ router.get('/:id', protect, async (req, res) => {
 
 // @route   POST /api/executions
 // @desc    Create new execution (allows multiple executions for same test case/plan for history tracking)
-// @access  Private (QA Lead, QA Engineer)
-router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateExecutionBelongsToTestPlan, async (req, res) => {
+// @access  Private (Admin, QA Lead, QA Engineer, QA Automation)
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer', 'qa_automation'), validateExecutionBelongsToTestPlan, async (req, res) => {
     try {
         const { testCase, testPlan, status, comments, linkedDefect, createDefect } = req.body;
+
+        // Fetch the test case to get the project
+        const testCaseData = await TestCase.findById(testCase);
+        if (!testCaseData) {
+            return res.status(404).json({
+                success: false,
+                message: 'Test case not found'
+            });
+        }
 
         // Create new execution record - allows multiple executions for same test case/plan
         // This enables re-execution and history tracking as per spec requirements
         const execution = await Execution.create({
             testCase,
             testPlan,
+            project: testCaseData.project,
             executedBy: req.user.id,
             status: status || 'not_run',
             comments,
@@ -183,8 +254,8 @@ router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engi
 
 // @route   PUT /api/executions/:id
 // @desc    Update execution
-// @access  Private (QA Lead, QA Engineer)
-router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateExecutionBelongsToTestPlan, async (req, res) => {
+// @access  Private (Admin, QA Lead, QA Engineer, QA Automation)
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer', 'qa_automation'), validateExecutionBelongsToTestPlan, async (req, res) => {
     try {
         const execution = req.execution || await Execution.findById(req.params.id);
 

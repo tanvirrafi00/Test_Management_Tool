@@ -15,6 +15,11 @@ const executionSchema = new mongoose.Schema({
         ref: 'TestPlan',
         required: true
     },
+    project: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Project',
+        required: true
+    },
     executedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

@@ -43,7 +43,8 @@ router.post('/register', async (req, res) => {
             success: true,
             message: 'User registered successfully',
             data: {
-                user
+                user,
+                token
             }
         });
     } catch (error) {
@@ -116,7 +117,8 @@ router.post('/login', async (req, res) => {
             success: true,
             message: 'Login successful',
             data: {
-                user
+                user,
+                token
             }
         });
     } catch (error) {
@@ -274,7 +276,7 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
         const { role } = req.body;
 
         // Validate role
-        const validRoles = ['admin', 'qa_lead', 'qa_engineer', 'viewer'];
+        const validRoles = ['admin', 'qa_lead', 'qa_engineer', 'qa_automation', 'developer', 'product_manager'];
         if (!validRoles.includes(role)) {
             return res.status(400).json({
                 success: false,

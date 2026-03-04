@@ -3,6 +3,7 @@ const router = express.Router();
 const Defect = require('../models/Defect');
 const { protect, authorize, restrictViewer } = require('../middlewares/auth');
 const { validateDefectBelongsToTestCase } = require('../middlewares/validateDataIntegrity');
+const { getDefectFilter } = require('../utils/roleBasedFilter');
 
 // @route   GET /api/defects
 // @desc    Get all defects
@@ -12,6 +13,13 @@ router.get('/', protect, async (req, res) => {
         const { project, status, severity, priority, assignedTo, includeArchived } = req.query;
 
         let query = {};
+
+        // Apply role-based filtering
+        try {
+            query = await getDefectFilter(req.user, {});
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
 
         if (project) query.project = project;
         if (status) query.status = status;
@@ -65,6 +73,45 @@ router.get('/:id', protect, async (req, res) => {
             });
         }
 
+        // Check if user has access to this defect based on role
+        try {
+            const filter = await getDefectFilter(req.user, {});
+
+            // For QA roles, check if they have access to this specific defect
+            if (req.user.role !== 'admin' && req.user.role !== 'product_manager') {
+                if (req.user.role === 'qa_lead') {
+                    // QA Lead can access defects in their projects
+                    const Project = require('../models/Project');
+                    const userProjects = await Project.find({ teamMembers: req.user._id }).select('_id');
+                    const projectIds = userProjects.map(p => p._id);
+                    if (!projectIds.some(id => id.toString() === defect.project.toString())) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this defect'
+                        });
+                    }
+                } else if (req.user.role === 'qa_engineer' || req.user.role === 'qa_automation') {
+                    // QA Engineers can only access defects they created or assigned to them
+                    if (defect.createdBy?.toString() !== req.user.id && defect.assignedTo?.toString() !== req.user.id) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this defect'
+                        });
+                    }
+                } else if (req.user.role === 'developer') {
+                    // Developers can only access defects assigned to them
+                    if (defect.assignedTo?.toString() !== req.user.id) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this defect'
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
+
         res.status(200).json({
             success: true,
             data: defect
@@ -81,8 +128,8 @@ router.get('/:id', protect, async (req, res) => {
 
 // @route   POST /api/defects
 // @desc    Create new defect
-// @access  Private (QA Lead, QA Engineer)
-router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateDefectBelongsToTestCase, async (req, res) => {
+// @access  Private (QA Lead, QA Engineer, QA Automation)
+router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer', 'qa_automation'), validateDefectBelongsToTestCase, async (req, res) => {
     try {
         const {
             title,
@@ -137,8 +184,8 @@ router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engi
 
 // @route   PUT /api/defects/:id
 // @desc    Update defect
-// @access  Private (QA Lead, QA Engineer)
-router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), validateDefectBelongsToTestCase, async (req, res) => {
+// @access  Private (QA Lead, QA Engineer, QA Automation)
+router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer', 'qa_automation'), validateDefectBelongsToTestCase, async (req, res) => {
     try {
         const defect = req.defect || await Defect.findById(req.params.id);
 
@@ -310,8 +357,8 @@ router.put('/:id/assign', protect, restrictViewer, authorize('admin', 'qa_lead')
 
 // @route   PUT /api/defects/:id/status
 // @desc    Update defect status
-// @access  Private (QA Lead, QA Engineer)
-router.put('/:id/status', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer'), async (req, res) => {
+// @access  Private (Admin, QA Lead, QA Engineer, Developer)
+router.put('/:id/status', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engineer', 'qa_automation', 'developer'), async (req, res) => {
     try {
         const defect = await Defect.findById(req.params.id);
 
@@ -344,6 +391,58 @@ router.put('/:id/status', protect, restrictViewer, authorize('admin', 'qa_lead',
         res.status(500).json({
             success: false,
             message: 'Error updating defect status',
+            error: error.message
+        });
+    }
+});
+
+// @route   POST /api/defects/:id/comments
+// @desc    Add comment to defect
+// @access  Private
+router.post('/:id/comments', protect, async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) {
+            return res.status(400).json({ success: false, message: 'Comment text is required' });
+        }
+
+        const defect = await Defect.findById(req.params.id);
+        if (!defect) {
+            return res.status(404).json({ success: false, message: 'Defect not found' });
+        }
+
+        // RBAC Check for commenting
+        if (req.user.role === 'product_manager') {
+            return res.status(403).json({ success: false, message: 'Product Managers have read-only access' });
+        }
+
+        if (req.user.role === 'developer' && defect.assignedTo?.toString() !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Developers can only comment on assigned defects' });
+        }
+
+        // Add comment
+        defect.comments.push({
+            text,
+            user: req.user.id
+        });
+
+        await defect.save();
+
+        const updatedDefect = await Defect.findById(defect._id)
+            .populate('project', 'name')
+            .populate('createdBy', 'name email')
+            .populate('assignedTo', 'name email')
+            .populate('comments.user', 'name email');
+
+        res.status(200).json({
+            success: true,
+            data: updatedDefect
+        });
+    } catch (error) {
+        console.error('Add comment error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error adding comment',
             error: error.message
         });
     }

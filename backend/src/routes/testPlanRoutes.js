@@ -3,6 +3,7 @@ const router = express.Router();
 const TestPlan = require('../models/TestPlan');
 const { protect, authorize, restrictViewer } = require('../middlewares/auth');
 const { validateTestPlanBelongsToProject, validateTestCasesBelongToProject } = require('../middlewares/validateDataIntegrity');
+const { getTestPlanFilter } = require('../utils/roleBasedFilter');
 
 // @route   GET /api/testplans
 // @desc    Get all test plans
@@ -12,6 +13,13 @@ router.get('/', protect, async (req, res) => {
         const { project, status, includeCancelled } = req.query;
 
         let query = {};
+
+        // Apply role-based filtering
+        try {
+            query = await getTestPlanFilter(req.user, {});
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
 
         if (project) query.project = project;
         if (status) query.status = status;
@@ -58,6 +66,48 @@ router.get('/:id', protect, async (req, res) => {
                 success: false,
                 message: 'Test plan not found'
             });
+        }
+
+        // Check if user has access to this test plan based on role
+        try {
+            const filter = await getTestPlanFilter(req.user, {});
+            if (filter._id === null) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied to test plans'
+                });
+            }
+            
+            // For QA roles, check if they have access to this specific test plan
+            if (req.user.role !== 'admin' && req.user.role !== 'product_manager') {
+                if (req.user.role === 'qa_lead') {
+                    // QA Lead can access test plans in their projects
+                    const Project = require('../models/Project');
+                    const userProjects = await Project.find({ teamMembers: req.user._id }).select('_id');
+                    const projectIds = userProjects.map(p => p._id);
+                    if (!projectIds.some(id => id.toString() === testPlan.project.toString())) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this test plan'
+                        });
+                    }
+                } else if (req.user.role === 'qa_engineer' || req.user.role === 'qa_automation') {
+                    // QA Engineers can only access test plans they're assigned to
+                    if (!testPlan.assignedTesters?.some(id => id.toString() === req.user.id)) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Access denied to this test plan'
+                        });
+                    }
+                } else if (req.user.role === 'developer') {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Developers cannot access test plans'
+                    });
+                }
+            }
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
         }
 
         res.status(200).json({

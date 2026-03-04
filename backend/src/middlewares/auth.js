@@ -71,12 +71,12 @@ const authorize = (...roles) => {
     };
 };
 
-// Restrict Viewer role from modifying data (POST, PUT, DELETE)
+// Restrict Product Manager role from modifying data (POST, PUT, DELETE)
 const restrictViewer = (req, res, next) => {
-    if (req.user.role === 'viewer' && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    if (req.user.role === 'product_manager' && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
         return res.status(403).json({
             success: false,
-            message: 'Viewer role has read-only access and cannot modify data'
+            message: 'Product Manager has read-only access and cannot modify data'
         });
     }
     next();

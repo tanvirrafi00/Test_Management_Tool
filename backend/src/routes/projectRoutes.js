@@ -3,6 +3,7 @@ const router = express.Router();
 const Project = require('../models/Project');
 const { protect, authorize, restrictViewer } = require('../middlewares/auth');
 const { validateCreatorOrAdmin } = require('../middlewares/validateDataIntegrity');
+const { getProjectFilter } = require('../utils/roleBasedFilter');
 
 // @route   GET /api/projects
 // @desc    Get all projects
@@ -12,6 +13,14 @@ router.get('/', protect, async (req, res) => {
         const { includeArchived } = req.query;
 
         let query = {};
+
+        // Apply role-based filtering
+        try {
+            query = await getProjectFilter(req.user);
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
+
         // Filter out archived projects unless explicitly requested
         if (includeArchived !== 'true') {
             query.status = { $ne: 'archived' };
@@ -42,6 +51,13 @@ router.get('/', protect, async (req, res) => {
 // @access  Private
 router.get('/:id', protect, async (req, res) => {
     try {
+        // Check if user has access to this project
+        try {
+            await getProjectFilter(req.user, req.params.id);
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
+
         const project = await Project.findById(req.params.id)
             .populate('createdBy', 'name email')
             .populate('teamMembers', 'name email role');
