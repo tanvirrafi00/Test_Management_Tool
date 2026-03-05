@@ -268,6 +268,30 @@ router.get('/users', protect, authorize('admin'), async (req, res) => {
     }
 });
 
+// @route   GET /api/auth/users/available
+// @desc    Get all users (for member assignment)
+// @access  Private (All authenticated users)
+router.get('/users/available', protect, async (req, res) => {
+    try {
+        const users = await User.find()
+            .select('-password')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users
+        });
+    } catch (error) {
+        console.error('Get available users error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching users',
+            error: error.message
+        });
+    }
+});
+
 // @route   PUT /api/auth/users/:id/role
 // @desc    Update user role
 // @access  Private (Admin only)

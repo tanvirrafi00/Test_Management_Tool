@@ -84,7 +84,7 @@ export default function Projects() {
 
     const fetchUsers = async () => {
         try {
-            const response = await authAPI.getUsers();
+            const response = await authAPI.getUsersAvailable();
             setUsers(response.data.data || []);
         } catch (error) {
             console.error('Error fetching users:', error);

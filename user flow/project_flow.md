@@ -527,3 +527,395 @@ ensures
 ---
 
 END
+
+
+
+
+# TestFlow – Project View (Assigned Member Perspective)
+
+---
+
+# 1. Purpose
+
+The Project View allows assigned team members to:
+
+- Understand the project scope
+- Access features and test cases
+- View their assigned work
+- Monitor testing progress
+- Track defects related to the project
+
+Each user sees **data filtered according to their role and assignments**.
+
+---
+
+# 2. Access Rules
+
+Only **assigned members** can access a project.
+
+Assigned roles may include:
+
+- QA Lead
+- QA Engineer
+- QA Automation Engineer
+- Developer
+- Product Manager
+
+If a user is not assigned to the project, they **cannot view the project**.
+
+---
+
+# 3. Project Page Layout
+
+When a user opens a project, they see the **Project Dashboard**.
+
+## Top Section (Project Header)
+
+Displays:
+
+Project Name  
+Project Status  
+Project Description  
+Start Date  
+Release Version  
+QA Lead  
+Team Members  
+
+Example:
+
+Project: Banking App  
+Status: Active  
+QA Lead: Sarah Khan  
+Team Members: 12  
+
+---
+
+# 4. Navigation Tabs
+
+Inside a project, users navigate through structured modules.
+
+Navigation:
+
+Dashboard  
+Features  
+Test Cases  
+Test Plans  
+Defects  
+Reports  
+Team
+
+Each tab shows data filtered based on **role permissions**.
+
+---
+
+# 5. Project Dashboard (Assigned Member View)
+
+The dashboard provides a quick overview of testing progress.
+
+Widgets displayed:
+
+- Total Features
+- Total Test Cases
+- Test Execution Progress
+- Defect Summary
+- My Assigned Tasks
+
+Example:
+
+Total Features: 8  
+Total Test Cases: 320  
+
+Execution:
+
+Passed: 180  
+Failed: 20  
+Not Run: 120  
+
+Execution Progress: 62%
+
+---
+
+# 6. My Assigned Work Section
+
+Each user sees **their personal tasks**.
+
+Example:
+
+My Assigned Test Cases: 15  
+My Active Test Plans: 2  
+Defects Assigned to Me: 3  
+
+This section helps users quickly start their work.
+
+---
+
+# 7. Features Tab
+
+Shows the list of features in the project.
+
+Columns:
+
+Feature Name  
+Owner  
+Total Test Cases  
+Execution Progress  
+Defect Count  
+Status  
+
+Example:
+
+| Feature | Test Cases | Progress | Defects |
+|--------|------------|---------|--------|
+| Login | 32 | 80% | 2 |
+| Cart | 25 | 60% | 5 |
+| Payment | 40 | 30% | 7 |
+
+Clicking a feature opens:
+
+- feature details
+- related test cases
+- defect list
+- execution results
+
+---
+
+# 8. Test Cases Tab
+
+Displays all test cases in the project.
+
+Users can filter by:
+
+Feature  
+Priority  
+Status  
+Assigned Tester  
+
+Example columns:
+
+Test Case ID  
+Title  
+Feature  
+Priority  
+Assigned To  
+Last Updated  
+
+QA Engineers see **their assigned cases highlighted**.
+
+---
+
+# 9. Test Plans Tab
+
+Shows all test plans for the project.
+
+Columns:
+
+Test Plan Name  
+Release Version  
+Status  
+Execution Progress  
+Created By  
+
+Example:
+
+| Test Plan | Release | Status | Progress |
+|----------|---------|--------|---------|
+| Sprint 5 Regression | v2.1 | Active | 45% |
+| Login Testing | v2.0 | Completed | 100% |
+
+Users can open test plans to view assigned execution tasks.
+
+---
+
+# 10. Defects Tab
+
+Displays all defects related to the project.
+
+Columns:
+
+Defect ID  
+Title  
+Severity  
+Status  
+Assigned Developer  
+Related Test Case  
+
+Example:
+
+| ID | Title | Severity | Status |
+|----|------|---------|--------|
+| BUG-101 | Login crash | Critical | Open |
+| BUG-102 | Cart quantity error | Medium | In Progress |
+
+Developers primarily work in this section.
+
+---
+
+# 11. Reports Tab
+
+Provides testing insights.
+
+Reports include:
+
+Test Execution Progress  
+Defect Distribution  
+Feature Coverage  
+Tester Performance  
+
+Example charts:
+
+- Execution progress chart
+- Defect severity distribution
+- Feature coverage graph
+
+---
+
+# 12. Team Tab
+
+Displays project members.
+
+Columns:
+
+Name  
+Role  
+Assigned Tasks  
+Status  
+
+Example:
+
+| Name | Role | Assigned Tasks |
+|-----|------|---------------|
+| Ahmed | QA Engineer | 18 |
+| Sara | QA Lead | Management |
+| John | Developer | 4 defects |
+
+Users can see who is responsible for different parts of testing.
+
+---
+
+# 13. Role-Based Visibility
+
+Different roles see slightly different project views.
+
+---
+
+## QA Engineer
+
+Can view:
+
+Features  
+Test Cases  
+Assigned Test Plans  
+Defects  
+
+Main focus:
+
+Executing test cases and reporting bugs.
+
+---
+
+## QA Automation Engineer
+
+Can view:
+
+Features  
+Automated test cases  
+Execution results  
+
+Main focus:
+
+Automation execution.
+
+---
+
+## QA Lead
+
+Can view:
+
+Full project dashboard  
+Team performance  
+All test plans  
+Execution progress  
+
+Main focus:
+
+Monitoring testing progress.
+
+---
+
+## Developer
+
+Can view:
+
+Defects  
+Related test cases  
+Feature information  
+
+Main focus:
+
+Fixing bugs.
+
+---
+
+## Product Manager
+
+Can view:
+
+Project dashboard  
+Execution progress  
+Defect trends  
+
+Main focus:
+
+Release readiness.
+
+---
+
+# 14. Example User Flow (QA Engineer)
+
+Login  
+↓  
+Open Assigned Project  
+↓  
+View Dashboard  
+↓  
+Check "My Assigned Tasks"  
+↓  
+Open Test Plan  
+↓  
+Execute Test Cases  
+↓  
+Log Defect if needed
+
+---
+
+# 15. Key Design Principles
+
+Project view must:
+
+- Be role-aware
+- Highlight assigned work
+- Provide quick navigation
+- Show real-time testing progress
+- Support filtering and search
+
+This ensures productivity and visibility across the team.
+
+---
+
+# 16. Summary
+
+The Project View is the **central workspace for all assigned team members**.
+
+It provides:
+
+- Project overview
+- Feature organization
+- Test execution management
+- Defect tracking
+- Team collaboration
+
+The interface adapts based on **user roles and responsibilities**, ensuring each user sees relevant information.
+
+---
+
+END
