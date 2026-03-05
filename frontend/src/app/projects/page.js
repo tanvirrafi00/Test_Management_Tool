@@ -744,11 +744,10 @@ export default function Projects() {
                     </Button>
                     <Button
                         onClick={async () => {
-                            // Add selected members before closing
+                            // Add selected members but keep modal open
                             if (selectedUsersToAdd.length > 0) {
                                 await handleBulkAddMembers();
                             }
-                            setShowMemberModal(false);
                         }}
                         disabled={isUpdatingMembers}
                         className="flex-1 rounded-xl shadow-lg shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
