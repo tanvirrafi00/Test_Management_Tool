@@ -93,7 +93,7 @@ router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead'), async (
         const project = await Project.create({
             name,
             description,
-            createdBy: req.user.id,
+            createdBy: req.user._id,
             teamMembers: teamMembers || []
         });
 
