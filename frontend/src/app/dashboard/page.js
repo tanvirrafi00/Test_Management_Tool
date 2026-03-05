@@ -55,7 +55,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchAllData();
-  }, []);
+  }, [user]);
 
   const fetchAllData = async () => {
     setLoading(true);
