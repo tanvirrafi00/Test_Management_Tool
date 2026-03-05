@@ -562,43 +562,67 @@ const UserManagement = () => {
                                                 <div className="relative">
                                                     <button
                                                         onClick={() => setShowUserMenu(showUserMenu === user._id ? null : user._id)}
-                                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                                                     >
                                                         <MoreVertical className="w-5 h-5 text-gray-600" />
                                                     </button>
                                                     {showUserMenu === user._id && (
-                                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                                                            <button
-                                                                onClick={() => openEditModal(user)}
-                                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 first:rounded-t-lg"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                                Edit User
-                                                            </button>
-                                                            <button
-                                                                onClick={() => openResetPasswordModal(user)}
-                                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                                            >
-                                                                <Lock className="w-4 h-4" />
-                                                                Reset Password
-                                                            </button>
-                                                            {user.isActive ? (
+                                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                                            <div className="py-2">
                                                                 <button
-                                                                    onClick={() => handleDeactivateUser(user._id)}
-                                                                    className="w-full px-4 py-2 text-left text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-2 last:rounded-b-lg"
+                                                                    onClick={() => openEditModal(user)}
+                                                                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors group"
                                                                 >
-                                                                    <Power className="w-4 h-4" />
-                                                                    Deactivate
+                                                                    <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                                                        <Edit className="w-4 h-4 text-blue-600" />
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <div className="text-sm font-medium">Edit User</div>
+                                                                        <div className="text-xs text-gray-500">Update name and email</div>
+                                                                    </div>
                                                                 </button>
-                                                            ) : (
+                                                                <div className="border-t border-gray-100 my-1"></div>
                                                                 <button
-                                                                    onClick={() => handleActivateUser(user._id)}
-                                                                    className="w-full px-4 py-2 text-left text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 last:rounded-b-lg"
+                                                                    onClick={() => openResetPasswordModal(user)}
+                                                                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-3 transition-colors group"
                                                                 >
-                                                                    <Power className="w-4 h-4" />
-                                                                    Activate
+                                                                    <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                                                        <Lock className="w-4 h-4 text-amber-600" />
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <div className="text-sm font-medium">Reset Password</div>
+                                                                        <div className="text-xs text-gray-500">Set new password</div>
+                                                                    </div>
                                                                 </button>
-                                                            )}
+                                                                <div className="border-t border-gray-100 my-1"></div>
+                                                                {user.isActive ? (
+                                                                    <button
+                                                                        onClick={() => handleDeactivateUser(user._id)}
+                                                                        className="w-full px-4 py-3 text-left text-sm text-rose-600 hover:bg-rose-50 flex items-center gap-3 transition-colors group"
+                                                                    >
+                                                                        <div className="p-2 bg-rose-50 rounded-lg group-hover:bg-rose-100 transition-colors">
+                                                                            <Power className="w-4 h-4" />
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <div className="text-sm font-medium">Deactivate</div>
+                                                                            <div className="text-xs text-gray-500">Disable account access</div>
+                                                                        </div>
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleActivateUser(user._id)}
+                                                                        className="w-full px-4 py-3 text-left text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-3 transition-colors group"
+                                                                    >
+                                                                        <div className="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                                                                            <Power className="w-4 h-4" />
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <div className="text-sm font-medium">Activate</div>
+                                                                            <div className="text-xs text-gray-500">Enable account access</div>
+                                                                        </div>
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>

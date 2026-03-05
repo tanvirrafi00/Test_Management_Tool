@@ -89,28 +89,35 @@ export default function CreateMenu({ userRole }) {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Quick Actions</p>
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                    <div className="px-5 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-white rounded-lg shadow-sm">
+                                <Plus className="h-4 w-4 text-indigo-600" />
+                            </div>
+                            <p className="text-sm font-bold text-indigo-900 uppercase tracking-wider">Quick Actions</p>
+                        </div>
                     </div>
-                    {menuItems.map((item, index) => {
-                        const Icon = item.icon;
-                        return (
-                            <button
-                                key={index}
-                                onClick={item.onClick}
-                                className="w-full px-4 py-3 hover:bg-gray-50 transition-colors flex items-start gap-3 text-left"
-                            >
-                                <div className="p-2 bg-primary-50 rounded-lg flex-shrink-0">
-                                    <Icon className="h-4 w-4 text-primary-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
-                                </div>
-                            </button>
-                        );
-                    })}
+                    <div className="py-1">
+                        {menuItems.map((item, index) => {
+                            const Icon = item.icon;
+                            return (
+                                <button
+                                    key={index}
+                                    onClick={item.onClick}
+                                    className="w-full px-4 py-3.5 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-200 flex items-start gap-3 text-left group border-b border-gray-100 last:border-b-0"
+                                >
+                                    <div className="p-2.5 bg-white rounded-xl shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200 flex-shrink-0">
+                                        <Icon className="h-4 w-4 text-indigo-600 group-hover:text-indigo-700" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">{item.label}</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
         </div>
