@@ -14,10 +14,19 @@ router.get('/', protect, async (req, res) => {
 
         let query = {};
 
+        // Debug logging
+        console.log('GET /api/projects - User:', {
+            id: req.user._id,
+            email: req.user.email,
+            role: req.user.role
+        });
+
         // Apply role-based filtering
         try {
             query = await getProjectFilter(req.user);
+            console.log('Project filter query:', query);
         } catch (err) {
+            console.error('Filter error:', err);
             return res.status(403).json({ success: false, message: err.message });
         }
 
@@ -30,6 +39,8 @@ router.get('/', protect, async (req, res) => {
             .populate('createdBy', 'name email')
             .populate('teamMembers', 'name email role')
             .sort({ createdAt: -1 });
+
+        console.log('Found projects:', projects.length);
 
         res.status(200).json({
             success: true,
