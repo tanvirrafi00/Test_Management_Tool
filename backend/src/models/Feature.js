@@ -17,8 +17,29 @@ const featureSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['active', 'deprecated'],
-        default: 'active'
+        enum: ['Active', 'Deprecated', 'In Development', 'Completed'],
+        default: 'In Development'
+    },
+    priority: {
+        type: String,
+        enum: ['High', 'Medium', 'Low'],
+        default: 'Medium'
+    },
+    owner: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    requirementLink: {
+        type: String,
+        trim: true
+    },
+    designDocument: {
+        type: String,
+        trim: true
+    },
+    storyReference: {
+        type: String,
+        trim: true
     },
     project: {
         type: mongoose.Schema.Types.ObjectId,

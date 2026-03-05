@@ -5,21 +5,18 @@ const TestCase = require('../models/TestCase');
 const TestPlan = require('../models/TestPlan');
 const Execution = require('../models/Execution');
 const Defect = require('../models/Defect');
+const Feature = require('../models/Feature');
+const User = require('../models/User');
 const { protect } = require('../middlewares/auth');
 const csv = require('csv-writer').createObjectCsvStringifier;
 const PDFDocument = require('pdfkit');
 
-// Helper to get project filter based on user role
+// Helper to get project IDs based on user role
 const getProjectFilter = async (user, projectId = null) => {
-    let filter = {};
-    if (projectId) {
-        filter.project = projectId;
-    }
-
     // Role-based filtering logic
     if (user.role === 'admin' || user.role === 'product_manager') {
         // Full visibility (PM is read-only in UI, but API allows full read)
-        return filter;
+        return null;
     }
 
     if (user.role === 'developer') {
@@ -31,10 +28,8 @@ const getProjectFilter = async (user, projectId = null) => {
             if (!projectIds.some(id => id.toString() === projectId.toString())) {
                 throw new Error('Access denied to this project');
             }
-        } else {
-            filter.project = { $in: projectIds };
         }
-        return filter;
+        return projectIds;
     }
 
     // QA Roles (Lead, Engineer, Automation)
@@ -45,11 +40,8 @@ const getProjectFilter = async (user, projectId = null) => {
         if (!projectIds.some(id => id.toString() === projectId.toString())) {
             throw new Error('Access denied to this project');
         }
-    } else {
-        filter.project = { $in: projectIds };
     }
-
-    return filter;
+    return projectIds;
 };
 
 // @route   GET /api/dashboard/stats
@@ -58,31 +50,53 @@ const getProjectFilter = async (user, projectId = null) => {
 router.get('/stats', protect, async (req, res) => {
     try {
         const { project } = req.query;
-        let projectFilter = {};
+        let projectIds = null;
 
         try {
-            projectFilter = await getProjectFilter(req.user, project);
+            projectIds = await getProjectFilter(req.user, project);
         } catch (err) {
             return res.status(403).json({ success: false, message: err.message });
         }
 
+        // Build filter based on project IDs
+        const projectFilter = projectIds ? { project: { $in: projectIds } } : {};
+
         // Get total counts
         const totalProjectsCount = (req.user.role === 'admin' || req.user.role === 'product_manager') && !project
             ? await Project.countDocuments()
-            : (projectFilter.project?.$in?.length || (project ? 1 : 0));
+            : (projectIds?.length || (project ? 1 : 0));
 
-        // Developers don't see Test Cases, Plans, or Executions
+        // Get total users count (only for admin)
+        const totalUsersCount = req.user.role === 'admin' ? await User.countDocuments() : 0;
+
+        // Role-based filtering
         const isDeveloper = req.user.role === 'developer';
-        const totalTestCases = isDeveloper ? 0 : await TestCase.countDocuments(projectFilter);
-        const totalTestPlans = isDeveloper ? 0 : await TestPlan.countDocuments(projectFilter);
-        const totalExecutions = isDeveloper ? 0 : await Execution.countDocuments(projectFilter);
+        const isQAEngineer = req.user.role === 'qa_engineer';
+        const isQAAutomation = req.user.role === 'qa_automation';
 
-        // Get execution statistics
-        const passCount = await Execution.countDocuments({ ...projectFilter, status: 'pass' });
-        const failCount = await Execution.countDocuments({ ...projectFilter, status: 'fail' });
-        const blockedCount = await Execution.countDocuments({ ...projectFilter, status: 'blocked' });
-        const notRunCount = await Execution.countDocuments({ ...projectFilter, status: 'not_run' });
-        const retestCount = await Execution.countDocuments({ ...projectFilter, status: 'retest' });
+        // QA Engineer and QA Automation only see their own test cases and executions
+        const testCaseFilter = isDeveloper
+            ? { _id: null }
+            : (isQAEngineer || isQAAutomation)
+                ? { ...projectFilter, createdBy: req.user._id }
+                : projectFilter;
+
+        const executionFilter = isDeveloper
+            ? { _id: null }
+            : (isQAEngineer || isQAAutomation)
+                ? { ...projectFilter, executedBy: req.user._id }
+                : projectFilter;
+
+        const totalTestCases = isDeveloper ? 0 : await TestCase.countDocuments(testCaseFilter);
+        const totalTestPlans = isDeveloper ? 0 : await TestPlan.countDocuments(projectFilter);
+        const totalExecutions = isDeveloper ? 0 : await Execution.countDocuments(executionFilter);
+
+        // Get execution statistics (apply role-based filtering)
+        const passCount = await Execution.countDocuments({ ...executionFilter, status: 'pass' });
+        const failCount = await Execution.countDocuments({ ...executionFilter, status: 'fail' });
+        const blockedCount = await Execution.countDocuments({ ...executionFilter, status: 'blocked' });
+        const notRunCount = await Execution.countDocuments({ ...executionFilter, status: 'not_run' });
+        const retestCount = await Execution.countDocuments({ ...executionFilter, status: 'retest' });
 
         // Calculate pass/fail rate
         const totalExecuted = passCount + failCount + blockedCount + retestCount;
@@ -90,11 +104,19 @@ router.get('/stats', protect, async (req, res) => {
         const failRate = totalExecuted > 0 ? ((failCount / totalExecuted) * 100).toFixed(2) : 0;
 
         // Get defect statistics
-        const openDefects = await Defect.countDocuments({ ...projectFilter, status: 'open' });
-        const inProgressDefects = await Defect.countDocuments({ ...projectFilter, status: 'in_progress' });
-        const fixedDefects = await Defect.countDocuments({ ...projectFilter, status: 'fixed' });
-        const closedDefects = await Defect.countDocuments({ ...projectFilter, status: 'closed' });
-        const retestDefects = await Defect.countDocuments({ ...projectFilter, status: 'retest' });
+        // For developers, filter by assigned defects
+        // For QA Engineer and QA Automation, filter by created defects
+        const defectFilter = isDeveloper
+            ? { assignedTo: req.user._id }
+            : (isQAEngineer || isQAAutomation)
+                ? { ...projectFilter, createdBy: req.user._id }
+                : projectFilter;
+
+        const openDefects = await Defect.countDocuments({ ...defectFilter, status: 'open' });
+        const inProgressDefects = await Defect.countDocuments({ ...defectFilter, status: 'in_progress' });
+        const fixedDefects = await Defect.countDocuments({ ...defectFilter, status: 'fixed' });
+        const closedDefects = await Defect.countDocuments({ ...defectFilter, status: 'closed' });
+        const retestDefects = await Defect.countDocuments({ ...defectFilter, status: 'retest' });
 
         // Calculate test coverage (test cases executed / total test cases)
         const testCoverage = totalTestCases > 0 ? ((totalExecuted / totalTestCases) * 100).toFixed(2) : 0;
@@ -173,6 +195,7 @@ router.get('/stats', protect, async (req, res) => {
             success: true,
             data: {
                 totalProjects: totalProjectsCount,
+                totalUsers: totalUsersCount,
                 totalTestCases,
                 totalTestPlans,
                 totalExecutions,
@@ -475,17 +498,37 @@ router.get('/reports/:reportType/:format', protect, async (req, res) => {
         const { reportType, format } = req.params;
         const { project } = req.query;
 
-        let projectFilter = {};
+        // Get role-based project filter
+        let projectIds = null;
+        try {
+            projectIds = await getProjectFilter(req.user, project);
+        } catch (err) {
+            return res.status(403).json({ success: false, message: err.message });
+        }
+
+        let projectFilter = projectIds ? { project: { $in: projectIds } } : {};
         if (project) {
             projectFilter = { project };
         }
+
+        // Role-based filtering
+        const isDeveloper = req.user.role === 'developer';
+        const isQAEngineer = req.user.role === 'qa_engineer';
+        const isQAAutomation = req.user.role === 'qa_automation';
 
         let data = [];
         let filename = `${reportType}-report`;
 
         switch (reportType) {
             case 'execution-summary':
-                const executions = await Execution.find(projectFilter)
+                // Apply role-based filtering for executions
+                const executionReportFilter = isDeveloper
+                    ? { _id: null }
+                    : (isQAEngineer || isQAAutomation)
+                        ? { ...projectFilter, executedBy: req.user._id }
+                        : projectFilter;
+
+                const executions = await Execution.find(executionReportFilter)
                     .populate('testCase', 'title')
                     .populate('testPlan', 'name')
                     .populate('executedBy', 'name')
@@ -504,8 +547,15 @@ router.get('/reports/:reportType/:format', protect, async (req, res) => {
                 break;
 
             case 'tester-wise':
+                // Apply role-based filtering for tester-wise report
+                const testerReportFilter = isDeveloper
+                    ? { executedBy: null }
+                    : (isQAEngineer || isQAAutomation)
+                        ? { ...projectFilter, executedBy: req.user._id }
+                        : projectFilter;
+
                 const testerStats = await Execution.aggregate([
-                    { $match: projectFilter },
+                    { $match: testerReportFilter },
                     {
                         $group: {
                             _id: '$executedBy',
@@ -603,7 +653,14 @@ router.get('/reports/:reportType/:format', protect, async (req, res) => {
                 break;
 
             case 'defect-summary':
-                const defects = await Defect.find(projectFilter)
+                // Apply role-based filtering for defects
+                const defectReportFilter = isDeveloper
+                    ? { assignedTo: req.user._id }
+                    : (isQAEngineer || isQAAutomation)
+                        ? { ...projectFilter, createdBy: req.user._id }
+                        : projectFilter;
+
+                const defects = await Defect.find(defectReportFilter)
                     .populate('project', 'name')
                     .populate('createdBy', 'name')
                     .populate('assignedTo', 'name')
@@ -623,10 +680,17 @@ router.get('/reports/:reportType/:format', protect, async (req, res) => {
                 break;
 
             case 'test-coverage':
-                const coverageData = await TestCase.find(projectFilter)
+                // Apply role-based filtering for test cases
+                const coverageFilter = isDeveloper
+                    ? { _id: null }
+                    : (isQAEngineer || isQAAutomation)
+                        ? { ...projectFilter, createdBy: req.user._id }
+                        : projectFilter;
+
+                const coverageData = await TestCase.find(coverageFilter)
                     .populate('project', 'name');
 
-                const coverageExecutions = await Execution.find(projectFilter);
+                const coverageExecutions = await Execution.find(coverageFilter);
                 const executedTestCaseIds = new Set(coverageExecutions.map(e => e.testCase.toString()));
 
                 data = coverageData.map(tc => ({
@@ -641,13 +705,26 @@ router.get('/reports/:reportType/:format', protect, async (req, res) => {
                 break;
 
             case 'activity':
-                const recentTestCases = await TestCase.find(projectFilter)
+                // Apply role-based filtering for activity report
+                const activityTcFilter = isDeveloper
+                    ? { _id: null }
+                    : (isQAEngineer || isQAAutomation)
+                        ? { ...projectFilter, createdBy: req.user._id }
+                        : projectFilter;
+
+                const activityDefectFilter = isDeveloper
+                    ? { assignedTo: req.user._id }
+                    : (isQAEngineer || isQAAutomation)
+                        ? { ...projectFilter, createdBy: req.user._id }
+                        : projectFilter;
+
+                const recentTestCases = await TestCase.find(activityTcFilter)
                     .populate('project', 'name')
                     .populate('createdBy', 'name')
                     .sort({ createdAt: -1 })
                     .limit(20);
 
-                const recentDefects = await Defect.find(projectFilter)
+                const recentDefects = await Defect.find(activityDefectFilter)
                     .populate('project', 'name')
                     .populate('createdBy', 'name')
                     .sort({ createdAt: -1 })

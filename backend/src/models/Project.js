@@ -13,8 +13,38 @@ const projectSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['active', 'archived'],
-        default: 'active'
+        enum: ['Draft', 'Active', 'On Hold', 'Completed', 'Archived'],
+        default: 'Draft'
+    },
+    productOwner: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    qaLead: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    startDate: {
+        type: Date
+    },
+    expectedEndDate: {
+        type: Date
+    },
+    repositoryUrl: {
+        type: String,
+        trim: true
+    },
+    documentationLink: {
+        type: String,
+        trim: true
+    },
+    jiraReference: {
+        type: String,
+        trim: true
+    },
+    environmentDetails: {
+        type: String,
+        trim: true
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,

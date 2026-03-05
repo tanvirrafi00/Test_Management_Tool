@@ -26,6 +26,7 @@ import {
 export default function Features() {
     const [features, setFeatures] = useState([]);
     const [projects, setProjects] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +44,12 @@ export default function Features() {
         name: '',
         description: '',
         project: '',
+        status: 'In Development',
+        priority: 'Medium',
+        owner: '',
+        requirementLink: '',
+        designDocument: '',
+        storyReference: '',
     });
 
     const [formErrors, setFormErrors] = useState({});
@@ -66,6 +73,7 @@ export default function Features() {
     useEffect(() => {
         fetchFeatures();
         fetchProjects();
+        fetchUsers();
     }, []);
 
     const fetchFeatures = async () => {
@@ -98,6 +106,16 @@ export default function Features() {
             setProjects(response.data.data || []);
         } catch (error) {
             console.error('Error fetching projects:', error);
+        }
+    };
+
+    const fetchUsers = async () => {
+        try {
+            const response = await fetch('/api/auth/users');
+            const userData = await response.json();
+            setUsers(userData.data || []);
+        } catch (error) {
+            console.error('Error fetching users:', error);
         }
     };
 
@@ -169,7 +187,17 @@ export default function Features() {
         try {
             await featuresAPI.create(formData);
             setShowCreateModal(false);
-            setFormData({ name: '', description: '', project: '' });
+            setFormData({
+                name: '',
+                description: '',
+                project: '',
+                status: 'In Development',
+                priority: 'Medium',
+                owner: '',
+                requirementLink: '',
+                designDocument: '',
+                storyReference: '',
+            });
             fetchFeatures();
         } catch (error) {
             setFormErrors({ submit: error.response?.data?.message || 'Failed to create feature' });
@@ -184,7 +212,17 @@ export default function Features() {
         try {
             await featuresAPI.update(selectedFeature._id, formData);
             setShowEditModal(false);
-            setFormData({ name: '', description: '', project: '' });
+            setFormData({
+                name: '',
+                description: '',
+                project: '',
+                status: 'In Development',
+                priority: 'Medium',
+                owner: '',
+                requirementLink: '',
+                designDocument: '',
+                storyReference: '',
+            });
             setSelectedFeature(null);
             fetchFeatures();
         } catch (error) {
@@ -296,8 +334,10 @@ export default function Features() {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 options={[
                                     { label: 'All Status', value: 'all' },
-                                    { label: 'Active', value: 'active' },
-                                    { label: 'Deprecated', value: 'deprecated' },
+                                    { label: 'Active', value: 'Active' },
+                                    { label: 'Deprecated', value: 'Deprecated' },
+                                    { label: 'In Development', value: 'In Development' },
+                                    { label: 'Completed', value: 'Completed' },
                                 ]}
                                 containerClassName="mb-0"
                                 className="rounded-xl py-2.5"
@@ -399,7 +439,7 @@ export default function Features() {
                 isOpen={showCreateModal}
                 onClose={() => setShowCreateModal(false)}
                 title="Create New Feature"
-                size="md"
+                size="lg"
             >
                 <form onSubmit={handleCreateFeature}>
                     <Input
@@ -426,23 +466,114 @@ export default function Features() {
                             <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.description}</p>
                         )}
                     </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Project *
+                            </label>
+                            <Select
+                                value={formData.project}
+                                onChange={(e) => setFormData(prev => ({ ...prev, project: e.target.value }))}
+                                options={[
+                                    { label: 'Select a project...', value: '' },
+                                    ...projects.map(p => ({ label: p.name, value: p._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                            {formErrors.project && (
+                                <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.project}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Status
+                            </label>
+                            <Select
+                                value={formData.status}
+                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                                options={[
+                                    { label: 'In Development', value: 'In Development' },
+                                    { label: 'Active', value: 'Active' },
+                                    { label: 'Completed', value: 'Completed' },
+                                    { label: 'Deprecated', value: 'Deprecated' },
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Priority
+                            </label>
+                            <Select
+                                value={formData.priority}
+                                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                                options={[
+                                    { label: 'High', value: 'High' },
+                                    { label: 'Medium', value: 'Medium' },
+                                    { label: 'Low', value: 'Low' },
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Owner
+                            </label>
+                            <Select
+                                value={formData.owner}
+                                onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
+                                options={[
+                                    { label: 'Select Owner...', value: '' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                    </div>
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
-                            Project *
+                            Requirement Link (Optional)
                         </label>
-                        <Select
-                            value={formData.project}
-                            onChange={(e) => setFormData(prev => ({ ...prev, project: e.target.value }))}
-                            options={[
-                                { label: 'Select a project...', value: '' },
-                                ...projects.map(p => ({ label: p.name, value: p._id }))
-                            ]}
-                            containerClassName="mb-0"
-                            className="rounded-xl py-2.5"
+                        <input
+                            type="url"
+                            name="requirementLink"
+                            value={formData.requirementLink}
+                            onChange={handleInputChange}
+                            placeholder="https://requirements.example.com"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
                         />
-                        {formErrors.project && (
-                            <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.project}</p>
-                        )}
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Design Document (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="designDocument"
+                            value={formData.designDocument}
+                            onChange={handleInputChange}
+                            placeholder="https://design.example.com"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Story Reference (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            name="storyReference"
+                            value={formData.storyReference}
+                            onChange={handleInputChange}
+                            placeholder="STORY-123"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
                     </div>
                     {formErrors.submit && (
                         <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>
@@ -468,7 +599,7 @@ export default function Features() {
                 isOpen={showEditModal && !!selectedFeature}
                 onClose={() => setShowEditModal(false)}
                 title="Edit Feature"
-                size="md"
+                size="lg"
             >
                 <form onSubmit={handleEditFeature}>
                     <Input
@@ -494,6 +625,95 @@ export default function Features() {
                         {formErrors.description && (
                             <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.description}</p>
                         )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Status
+                            </label>
+                            <Select
+                                value={formData.status}
+                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                                options={[
+                                    { label: 'In Development', value: 'In Development' },
+                                    { label: 'Active', value: 'Active' },
+                                    { label: 'Completed', value: 'Completed' },
+                                    { label: 'Deprecated', value: 'Deprecated' },
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Priority
+                            </label>
+                            <Select
+                                value={formData.priority}
+                                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                                options={[
+                                    { label: 'High', value: 'High' },
+                                    { label: 'Medium', value: 'Medium' },
+                                    { label: 'Low', value: 'Low' },
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Owner
+                        </label>
+                        <Select
+                            value={formData.owner}
+                            onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
+                            options={[
+                                { label: 'Select Owner...', value: '' },
+                                ...users.map(u => ({ label: u.name, value: u._id }))
+                            ]}
+                            containerClassName="mb-0"
+                            className="rounded-xl py-2.5"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Requirement Link (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="requirementLink"
+                            value={formData.requirementLink}
+                            onChange={handleInputChange}
+                            placeholder="https://requirements.example.com"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Design Document (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="designDocument"
+                            value={formData.designDocument}
+                            onChange={handleInputChange}
+                            placeholder="https://design.example.com"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Story Reference (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            name="storyReference"
+                            value={formData.storyReference}
+                            onChange={handleInputChange}
+                            placeholder="STORY-123"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
                     </div>
                     {formErrors.submit && (
                         <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>

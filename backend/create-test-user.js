@@ -42,10 +42,10 @@ const createTestUsers = async () => {
                 role: 'qa_engineer'
             },
             {
-                name: 'Viewer',
-                email: 'viewer@testflow.com',
-                password: 'viewer123',
-                role: 'viewer'
+                name: 'Product Manager',
+                email: 'pm@testflow.com',
+                password: 'pm12345',
+                role: 'product_manager'
             }
         ];
 
@@ -59,7 +59,7 @@ const createTestUsers = async () => {
         console.log('   Admin: admin@testflow.com / admin123');
         console.log('   QA Lead: qa.lead@testflow.com / lead123');
         console.log('   QA Engineer: qa.engineer@testflow.com / engineer123');
-        console.log('   Viewer: viewer@testflow.com / viewer123');
+        console.log('   Product Manager: pm@testflow.com / pm12345');
 
     } catch (error) {
         console.error('❌ Error creating test users:', error);

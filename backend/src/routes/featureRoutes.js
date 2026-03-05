@@ -16,8 +16,10 @@ router.get('/', protect, async (req, res) => {
 
         // Apply role-based filtering
         try {
-            const projectFilter = await getProjectFilter(req.user);
-            query.project = { $in: projectFilter.project || projectFilter };
+            const projectIds = await getProjectFilter(req.user);
+            if (projectIds) {
+                query.project = { $in: projectIds };
+            }
         } catch (err) {
             return res.status(403).json({ success: false, message: err.message });
         }
@@ -34,6 +36,7 @@ router.get('/', protect, async (req, res) => {
 
         const features = await Feature.find(query)
             .populate('project', 'name')
+            .populate('owner', 'name email')
             .populate('createdBy', 'name email')
             .sort({ createdAt: -1 });
 
@@ -59,6 +62,7 @@ router.get('/:id', protect, async (req, res) => {
     try {
         const feature = await Feature.findById(req.params.id)
             .populate('project', 'name')
+            .populate('owner', 'name email')
             .populate('createdBy', 'name email');
 
         if (!feature) {
@@ -94,7 +98,17 @@ router.get('/:id', protect, async (req, res) => {
 // @access  Private (Admin, QA Lead)
 router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead'), async (req, res) => {
     try {
-        const { name, description, project } = req.body;
+        const {
+            name,
+            description,
+            status,
+            priority,
+            owner,
+            requirementLink,
+            designDocument,
+            storyReference,
+            project
+        } = req.body;
 
         if (!project) {
             return res.status(400).json({
@@ -113,12 +127,19 @@ router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead'), async (
         const feature = await Feature.create({
             name,
             description,
+            status: status || 'In Development',
+            priority: priority || 'Medium',
+            owner,
+            requirementLink,
+            designDocument,
+            storyReference,
             project,
             createdBy: req.user.id
         });
 
         const populatedFeature = await Feature.findById(feature._id)
             .populate('project', 'name')
+            .populate('owner', 'name email')
             .populate('createdBy', 'name email');
 
         res.status(201).json({
@@ -143,16 +164,31 @@ router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead'), valid
     try {
         const feature = req.entity;
 
-        const { name, description, status } = req.body;
+        const {
+            name,
+            description,
+            status,
+            priority,
+            owner,
+            requirementLink,
+            designDocument,
+            storyReference
+        } = req.body;
 
         if (name) feature.name = name;
         if (description !== undefined) feature.description = description;
         if (status) feature.status = status;
+        if (priority) feature.priority = priority;
+        if (owner !== undefined) feature.owner = owner;
+        if (requirementLink !== undefined) feature.requirementLink = requirementLink;
+        if (designDocument !== undefined) feature.designDocument = designDocument;
+        if (storyReference !== undefined) feature.storyReference = storyReference;
 
         await feature.save();
 
         const updatedFeature = await Feature.findById(feature._id)
             .populate('project', 'name')
+            .populate('owner', 'name email')
             .populate('createdBy', 'name email');
 
         res.status(200).json({
@@ -208,6 +244,7 @@ router.put('/:id/restore', protect, restrictViewer, authorize('admin', 'qa_lead'
 
         const restoredFeature = await Feature.findById(feature._id)
             .populate('project', 'name')
+            .populate('owner', 'name email')
             .populate('createdBy', 'name email');
 
         res.status(200).json({
@@ -226,3 +263,4 @@ router.put('/:id/restore', protect, restrictViewer, authorize('admin', 'qa_lead'
 });
 
 module.exports = router;
+

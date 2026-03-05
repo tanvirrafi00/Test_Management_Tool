@@ -345,4 +345,180 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
     }
 });
 
+// @route   PUT /api/auth/users/:id
+// @desc    Update user details
+// @access  Private (Admin only)
+router.put('/users/:id', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { name, email } = req.body;
+
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Prevent admin from editing their own details through this endpoint
+        if (user._id.toString() === req.user.id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot edit your own details through this endpoint. Use profile update instead.'
+            });
+        }
+
+        // Check if email is being changed and if it's already in use
+        if (email && email !== user.email) {
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email already in use'
+                });
+            }
+            user.email = email;
+        }
+
+        if (name) user.name = name;
+
+        await user.save();
+
+        const updatedUser = await User.findById(user._id).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: 'User updated successfully',
+            data: updatedUser
+        });
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating user',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/auth/users/:id/deactivate
+// @desc    Deactivate user account
+// @access  Private (Admin only)
+router.put('/users/:id/deactivate', protect, authorize('admin'), async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Prevent admin from deactivating themselves
+        if (user._id.toString() === req.user.id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot deactivate your own account'
+            });
+        }
+
+        user.isActive = false;
+        await user.save();
+
+        const updatedUser = await User.findById(user._id).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: 'User deactivated successfully',
+            data: updatedUser
+        });
+    } catch (error) {
+        console.error('Deactivate user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error deactivating user',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/auth/users/:id/activate
+// @desc    Activate user account
+// @access  Private (Admin only)
+router.put('/users/:id/activate', protect, authorize('admin'), async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        user.isActive = true;
+        await user.save();
+
+        const updatedUser = await User.findById(user._id).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: 'User activated successfully',
+            data: updatedUser
+        });
+    } catch (error) {
+        console.error('Activate user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error activating user',
+            error: error.message
+        });
+    }
+});
+
+// @route   PUT /api/auth/users/:id/reset-password
+// @desc    Reset user password
+// @access  Private (Admin only)
+router.put('/users/:id/reset-password', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters'
+            });
+        }
+
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        user.password = newPassword;
+        await user.save();
+
+        const updatedUser = await User.findById(user._id).select('-password');
+
+        res.status(200).json({
+            success: true,
+            message: 'Password reset successfully',
+            data: updatedUser
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error resetting password',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

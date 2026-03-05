@@ -5,20 +5,16 @@ const TestPlan = require('../models/TestPlan');
 const Execution = require('../models/Execution');
 
 /**
- * Get project filter based on user role
+ * Get project IDs based on user role
  * @param {Object} user - User object
- * @param {String} projectId - Optional project ID
- * @returns {Object} - Filter object for MongoDB queries
+ * @param {String} projectId - Optional project ID to check access
+ * @returns {Array} - Array of project IDs the user has access to
+ * @throws {Error} - If user doesn't have access to specified projectId
  */
 const getProjectFilter = async (user, projectId = null) => {
-    let filter = {};
-    if (projectId) {
-        filter.project = projectId;
-    }
-
     // Admin and Product Manager have full visibility
     if (user.role === 'admin' || user.role === 'product_manager') {
-        return filter;
+        return null; // null means no filter (all projects)
     }
 
     // Developers only see defects assigned to them
@@ -30,10 +26,8 @@ const getProjectFilter = async (user, projectId = null) => {
             if (!projectIds.some(id => id.toString() === projectId.toString())) {
                 throw new Error('Access denied to this project');
             }
-        } else {
-            filter.project = { $in: projectIds };
         }
-        return filter;
+        return projectIds;
     }
 
     // QA Roles (Lead, Engineer, Automation) see projects they're assigned to
@@ -44,11 +38,8 @@ const getProjectFilter = async (user, projectId = null) => {
         if (!projectIds.some(id => id.toString() === projectId.toString())) {
             throw new Error('Access denied to this project');
         }
-    } else {
-        filter.project = { $in: projectIds };
     }
-
-    return filter;
+    return projectIds;
 };
 
 /**

@@ -51,4 +51,7 @@ Thumbs.db
 
 # Project specific
 plan/
+user flow/
+*.md
+!README.md
 cookies.txt

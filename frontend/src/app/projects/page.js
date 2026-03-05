@@ -134,7 +134,19 @@ export default function Projects() {
         try {
             await projectsAPI.create(formData);
             setShowCreateModal(false);
-            setFormData({ name: '', description: '' });
+            setFormData({
+                name: '',
+                description: '',
+                status: 'Draft',
+                productOwner: '',
+                qaLead: '',
+                startDate: '',
+                expectedEndDate: '',
+                repositoryUrl: '',
+                documentationLink: '',
+                jiraReference: '',
+                environmentDetails: '',
+            });
             fetchProjects();
         } catch (error) {
             setFormErrors({ submit: error.response?.data?.message || 'Failed to create project' });
@@ -149,7 +161,19 @@ export default function Projects() {
         try {
             await projectsAPI.update(selectedProject._id, formData);
             setShowEditModal(false);
-            setFormData({ name: '', description: '' });
+            setFormData({
+                name: '',
+                description: '',
+                status: 'Draft',
+                productOwner: '',
+                qaLead: '',
+                startDate: '',
+                expectedEndDate: '',
+                repositoryUrl: '',
+                documentationLink: '',
+                jiraReference: '',
+                environmentDetails: '',
+            });
             setSelectedProject(null);
             fetchProjects();
         } catch (error) {
@@ -175,6 +199,15 @@ export default function Projects() {
         setFormData({
             name: project.name,
             description: project.description || '',
+            status: project.status || 'Draft',
+            productOwner: project.productOwner?._id || '',
+            qaLead: project.qaLead?._id || '',
+            startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+            expectedEndDate: project.expectedEndDate ? new Date(project.expectedEndDate).toISOString().split('T')[0] : '',
+            repositoryUrl: project.repositoryUrl || '',
+            documentationLink: project.documentationLink || '',
+            jiraReference: project.jiraReference || '',
+            environmentDetails: project.environmentDetails || '',
         });
         setShowEditModal(true);
     };
@@ -316,8 +349,11 @@ export default function Projects() {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 options={[
                                     { label: 'All Status', value: 'all' },
-                                    { label: 'Active', value: 'active' },
-                                    { label: 'Archived', value: 'archived' },
+                                    { label: 'Draft', value: 'Draft' },
+                                    { label: 'Active', value: 'Active' },
+                                    { label: 'On Hold', value: 'On Hold' },
+                                    { label: 'Completed', value: 'Completed' },
+                                    { label: 'Archived', value: 'Archived' },
                                 ]}
                                 containerClassName="mb-0"
                                 className="rounded-xl py-2.5"
@@ -349,12 +385,20 @@ export default function Projects() {
                                             {project.description || 'No description provided for this project.'}
                                         </p>
                                     </div>
-                                    <Badge variant={project.status === 'active' ? 'success' : 'default'} className="mt-1">
-                                        {project.status || 'active'}
+                                    <Badge
+                                        variant={
+                                            project.status === 'Active' ? 'success' :
+                                                project.status === 'Draft' ? 'info' :
+                                                    project.status === 'On Hold' ? 'warning' :
+                                                        project.status === 'Completed' ? 'success' : 'default'
+                                        }
+                                        className="mt-1"
+                                    >
+                                        {project.status || 'Draft'}
                                     </Badge>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100 mt-auto">
+                                <div className="grid grid-cols-2 gap-3 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100 mt-auto">
                                     <div className="flex items-center text-sm text-gray-600">
                                         <Users className="h-4 w-4 mr-2 text-primary-500" />
                                         <span className="font-medium text-gray-900">{project.teamMembers?.length || 0}</span>
@@ -364,19 +408,51 @@ export default function Projects() {
                                         <Calendar className="h-4 w-4 mr-2 text-primary-500" />
                                         <span className="text-xs">{new Date(project.createdAt).toLocaleDateString()}</span>
                                     </div>
+                                    {project.productOwner && (
+                                        <div className="flex items-center text-sm text-gray-600 col-span-2">
+                                            <span className="font-medium text-gray-700 text-xs">PO:</span>
+                                            <span className="ml-1 text-xs text-gray-600">{project.productOwner.name}</span>
+                                        </div>
+                                    )}
+                                    {project.qaLead && (
+                                        <div className="flex items-center text-sm text-gray-600 col-span-2">
+                                            <span className="font-medium text-gray-700 text-xs">QA Lead:</span>
+                                            <span className="ml-1 text-xs text-gray-600">{project.qaLead.name}</span>
+                                        </div>
+                                    )}
+                                    {project.startDate && (
+                                        <div className="flex items-center text-sm text-gray-600 col-span-2">
+                                            <span className="font-medium text-gray-700 text-xs">Start:</span>
+                                            <span className="ml-1 text-xs text-gray-600">{new Date(project.startDate).toLocaleDateString()}</span>
+                                        </div>
+                                    )}
+                                    {project.expectedEndDate && (
+                                        <div className="flex items-center text-sm text-gray-600 col-span-2">
+                                            <span className="font-medium text-gray-700 text-xs">End:</span>
+                                            <span className="ml-1 text-xs text-gray-600">{new Date(project.expectedEndDate).toLocaleDateString()}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => window.location.href = `/projects/${project._id}`}
+                                        className="flex-1 text-xs py-1.5"
+                                    >
+                                        <Folder className="h-3.5 w-3.5 mr-1.5" />
+                                        View Project
+                                    </Button>
                                     {(currentUser?.role === 'admin' || currentUser?.role === 'qa_lead') ? (
                                         <>
                                             <Button
                                                 variant="secondary"
                                                 size="sm"
                                                 onClick={() => openMemberModal(project)}
-                                                className="flex-1 text-xs py-1.5"
+                                                className="text-xs py-1.5"
                                             >
                                                 <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                                                Members
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -399,9 +475,7 @@ export default function Projects() {
                                                 </Button>
                                             )}
                                         </>
-                                    ) : (
-                                        <div className="text-xs text-gray-400 italic py-1.5 w-full text-center">Assigned View Only</div>
-                                    )}
+                                    ) : null}
                                 </div>
                             </Card>
                         ))}
@@ -414,7 +488,7 @@ export default function Projects() {
                 isOpen={showCreateModal}
                 onClose={() => setShowCreateModal(false)}
                 title="Create New Project"
-                size="md"
+                size="lg"
             >
                 <form onSubmit={handleCreateProject}>
                     <Input
@@ -441,6 +515,134 @@ export default function Projects() {
                             <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.description}</p>
                         )}
                     </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Status
+                        </label>
+                        <Select
+                            value={formData.status}
+                            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                            options={[
+                                { label: 'Draft', value: 'Draft' },
+                                { label: 'Active', value: 'Active' },
+                                { label: 'On Hold', value: 'On Hold' },
+                                { label: 'Completed', value: 'Completed' },
+                                { label: 'Archived', value: 'Archived' },
+                            ]}
+                            containerClassName="mb-0"
+                            className="rounded-xl py-2.5"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Product Owner
+                            </label>
+                            <Select
+                                value={formData.productOwner}
+                                onChange={(e) => setFormData(prev => ({ ...prev, productOwner: e.target.value }))}
+                                options={[
+                                    { label: 'Select Product Owner...', value: '' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                QA Lead
+                            </label>
+                            <Select
+                                value={formData.qaLead}
+                                onChange={(e) => setFormData(prev => ({ ...prev, qaLead: e.target.value }))}
+                                options={[
+                                    { label: 'Select QA Lead...', value: '' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                name="startDate"
+                                value={formData.startDate}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Expected End Date
+                            </label>
+                            <input
+                                type="date"
+                                name="expectedEndDate"
+                                value={formData.expectedEndDate}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm"
+                            />
+                        </div>
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Repository URL (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="repositoryUrl"
+                            value={formData.repositoryUrl}
+                            onChange={handleInputChange}
+                            placeholder="https://github.com/your-repo"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Documentation Link (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="documentationLink"
+                            value={formData.documentationLink}
+                            onChange={handleInputChange}
+                            placeholder="https://docs.example.com"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Jira Reference (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            name="jiraReference"
+                            value={formData.jiraReference}
+                            onChange={handleInputChange}
+                            placeholder="PROJ-123"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Environment Details (Optional)
+                        </label>
+                        <textarea
+                            name="environmentDetails"
+                            value={formData.environmentDetails}
+                            onChange={handleInputChange}
+                            placeholder="Describe the testing environment..."
+                            rows={3}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
+                    </div>
                     {formErrors.submit && (
                         <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>
                     )}
@@ -465,7 +667,7 @@ export default function Projects() {
                 isOpen={showEditModal && !!selectedProject}
                 onClose={() => setShowEditModal(false)}
                 title="Edit Project"
-                size="md"
+                size="lg"
             >
                 <form onSubmit={handleEditProject}>
                     <Input
@@ -491,6 +693,134 @@ export default function Projects() {
                         {formErrors.description && (
                             <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.description}</p>
                         )}
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Status
+                        </label>
+                        <Select
+                            value={formData.status}
+                            onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                            options={[
+                                { label: 'Draft', value: 'Draft' },
+                                { label: 'Active', value: 'Active' },
+                                { label: 'On Hold', value: 'On Hold' },
+                                { label: 'Completed', value: 'Completed' },
+                                { label: 'Archived', value: 'Archived' },
+                            ]}
+                            containerClassName="mb-0"
+                            className="rounded-xl py-2.5"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Product Owner
+                            </label>
+                            <Select
+                                value={formData.productOwner}
+                                onChange={(e) => setFormData(prev => ({ ...prev, productOwner: e.target.value }))}
+                                options={[
+                                    { label: 'Select Product Owner...', value: '' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                QA Lead
+                            </label>
+                            <Select
+                                value={formData.qaLead}
+                                onChange={(e) => setFormData(prev => ({ ...prev, qaLead: e.target.value }))}
+                                options={[
+                                    { label: 'Select QA Lead...', value: '' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                name="startDate"
+                                value={formData.startDate}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                                Expected End Date
+                            </label>
+                            <input
+                                type="date"
+                                name="expectedEndDate"
+                                value={formData.expectedEndDate}
+                                onChange={handleInputChange}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm"
+                            />
+                        </div>
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Repository URL (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="repositoryUrl"
+                            value={formData.repositoryUrl}
+                            onChange={handleInputChange}
+                            placeholder="https://github.com/your-repo"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Documentation Link (Optional)
+                        </label>
+                        <input
+                            type="url"
+                            name="documentationLink"
+                            value={formData.documentationLink}
+                            onChange={handleInputChange}
+                            placeholder="https://docs.example.com"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Jira Reference (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            name="jiraReference"
+                            value={formData.jiraReference}
+                            onChange={handleInputChange}
+                            placeholder="PROJ-123"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
+                        />
+                    </div>
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Environment Details (Optional)
+                        </label>
+                        <textarea
+                            name="environmentDetails"
+                            value={formData.environmentDetails}
+                            onChange={handleInputChange}
+                            placeholder="Describe the testing environment..."
+                            rows={3}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
                     </div>
                     {formErrors.submit && (
                         <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>
