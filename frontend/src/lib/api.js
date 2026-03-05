@@ -61,6 +61,16 @@ export const projectsAPI = {
     removeMember: (id, userId) => api.delete(`/projects/${id}/members/${userId}`),
 };
 
+// Features API
+export const featuresAPI = {
+    getAll: (params) => api.get('/features', { params }),
+    getById: (id) => api.get(`/features/${id}`),
+    create: (data) => api.post('/features', data),
+    update: (id, data) => api.put(`/features/${id}`, data),
+    delete: (id) => api.delete(`/features/${id}`),
+    restore: (id) => api.put(`/features/${id}/restore`),
+};
+
 // Test Cases API
 export const testCasesAPI = {
     getAll: (params) => api.get('/testcases', { params }),

@@ -10,7 +10,7 @@ const { getTestCaseFilter } = require('../utils/roleBasedFilter');
 // @access  Private
 router.get('/', protect, async (req, res) => {
   try {
-    const { project, priority, status, search, includeDeprecated } = req.query;
+    const { project, feature, priority, status, search, includeDeprecated } = req.query;
 
     let query = {};
 
@@ -22,6 +22,7 @@ router.get('/', protect, async (req, res) => {
     }
 
     if (project) query.project = project;
+    if (feature) query.feature = feature;
     if (priority) query.priority = priority;
     if (status) query.status = status;
     // Filter out deprecated test cases unless explicitly requested
@@ -37,6 +38,7 @@ router.get('/', protect, async (req, res) => {
 
     const testCases = await TestCase.find(query)
       .populate('project', 'name')
+      .populate('feature', 'name')
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email')
       .sort({ createdAt: -1 });
@@ -63,6 +65,7 @@ router.get('/:id', protect, async (req, res) => {
   try {
     const testCase = await TestCase.findById(req.params.id)
       .populate('project', 'name')
+      .populate('feature', 'name')
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email');
 
@@ -82,7 +85,7 @@ router.get('/:id', protect, async (req, res) => {
           message: 'Access denied to test cases'
         });
       }
-      
+
       // For QA roles, check if they have access to this specific test case
       if (req.user.role !== 'admin' && req.user.role !== 'product_manager') {
         if (req.user.role === 'qa_lead') {
@@ -144,8 +147,17 @@ router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engi
       status,
       tags,
       project,
+      feature,
       assignedTo
     } = req.body;
+
+    // Feature is now required
+    if (!feature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Feature is required'
+      });
+    }
 
     const testCase = await TestCase.create({
       title,
@@ -157,12 +169,14 @@ router.post('/', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_engi
       status,
       tags,
       project,
+      feature,
       createdBy: req.user.id,
       assignedTo
     });
 
     const populatedTestCase = await TestCase.findById(testCase._id)
       .populate('project', 'name')
+      .populate('feature', 'name')
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email');
 
@@ -224,6 +238,7 @@ router.put('/:id', protect, restrictViewer, authorize('admin', 'qa_lead', 'qa_en
 
     const updatedTestCase = await TestCase.findById(testCase._id)
       .populate('project', 'name')
+      .populate('feature', 'name')
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email');
 
@@ -294,6 +309,7 @@ router.put('/:id/restore', protect, restrictViewer, authorize('admin', 'qa_lead'
 
     const restoredTestCase = await TestCase.findById(testCase._id)
       .populate('project', 'name')
+      .populate('feature', 'name')
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email');
 
@@ -342,6 +358,7 @@ router.post('/:id/clone', protect, restrictViewer, authorize('admin', 'qa_lead',
 
     const populatedTestCase = await TestCase.findById(clonedTestCase._id)
       .populate('project', 'name')
+      .populate('feature', 'name')
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email');
 

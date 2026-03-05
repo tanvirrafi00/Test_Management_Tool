@@ -37,6 +37,9 @@ export default function Projects() {
     const [showMemberModal, setShowMemberModal] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
+    const [memberSearchTerm, setMemberSearchTerm] = useState('');
+    const [selectedUsersToAdd, setSelectedUsersToAdd] = useState([]);
+    const [isUpdatingMembers, setIsUpdatingMembers] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -185,32 +188,79 @@ export default function Projects() {
     // Open member modal
     const openMemberModal = (project) => {
         setSelectedProject(project);
+        setMemberSearchTerm('');
+        setSelectedUsersToAdd([]);
         setShowMemberModal(true);
     };
 
     // Add member to project
     const handleAddMember = async (userId) => {
+        setIsUpdatingMembers(true);
         try {
-            await projectsAPI.addMember(selectedProject._id, { userId });
-            fetchProjects();
+            const response = await projectsAPI.addMember(selectedProject._id, { userId });
+            // Update selected project with new data
+            setSelectedProject(response.data.data);
+            // Also update projects list
+            setProjects(prev => prev.map(p =>
+                p._id === selectedProject._id ? response.data.data : p
+            ));
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to add member');
+        } finally {
+            setIsUpdatingMembers(false);
+        }
+    };
+
+    // Bulk add members to project
+    const handleBulkAddMembers = async () => {
+        if (selectedUsersToAdd.length === 0) return;
+
+        setIsUpdatingMembers(true);
+        try {
+            // Add all members sequentially to get updated project data
+            let updatedProject = selectedProject;
+            for (const userId of selectedUsersToAdd) {
+                const response = await projectsAPI.addMember(selectedProject._id, { userId });
+                updatedProject = response.data.data;
+            }
+
+            // Update selected project with final data
+            setSelectedProject(updatedProject);
+            // Also update projects list
+            setProjects(prev => prev.map(p =>
+                p._id === selectedProject._id ? updatedProject : p
+            ));
+
+            // Clear selection
+            setSelectedUsersToAdd([]);
+        } catch (error) {
+            setError(error.response?.data?.message || 'Failed to add members');
+        } finally {
+            setIsUpdatingMembers(false);
         }
     };
 
     // Remove member from project
     const handleRemoveMember = async (userId) => {
+        setIsUpdatingMembers(true);
         try {
-            await projectsAPI.removeMember(selectedProject._id, userId);
-            fetchProjects();
+            const response = await projectsAPI.removeMember(selectedProject._id, userId);
+            // Update selected project with new data
+            setSelectedProject(response.data.data);
+            // Also update projects list
+            setProjects(prev => prev.map(p =>
+                p._id === selectedProject._id ? response.data.data : p
+            ));
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to remove member');
+        } finally {
+            setIsUpdatingMembers(false);
         }
     };
 
     // Check if user is a member
     const isMember = (project, userId) => {
-        return project?.members?.some(member => member._id === userId);
+        return project?.teamMembers?.some(member => member._id === userId);
     };
 
     if (loading) {
@@ -307,8 +357,8 @@ export default function Projects() {
                                 <div className="grid grid-cols-2 gap-4 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100 mt-auto">
                                     <div className="flex items-center text-sm text-gray-600">
                                         <Users className="h-4 w-4 mr-2 text-primary-500" />
-                                        <span className="font-medium text-gray-900">{project.members?.length || 0}</span>
-                                        <span className="ml-1 text-gray-500 text-xs">member{project.members?.length !== 1 ? 's' : ''}</span>
+                                        <span className="font-medium text-gray-900">{project.teamMembers?.length || 0}</span>
+                                        <span className="ml-1 text-gray-500 text-xs">member{project.teamMembers?.length !== 1 ? 's' : ''}</span>
                                     </div>
                                     <div className="flex items-center text-sm text-gray-600">
                                         <Calendar className="h-4 w-4 mr-2 text-primary-500" />
@@ -496,95 +546,221 @@ export default function Projects() {
                 isOpen={showMemberModal && !!selectedProject}
                 onClose={() => setShowMemberModal(false)}
                 title="Manage Project Members"
-                size="md"
+                size="lg"
             >
                 <div className="space-y-6">
+                    {/* Project Info */}
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                        <div className="flex items-center gap-3">
+                            <Folder className="h-5 w-5 text-blue-600" />
+                            <div>
+                                <p className="font-semibold text-gray-900">{selectedProject?.name}</p>
+                                <p className="text-xs text-gray-600">
+                                    {selectedProject?.teamMembers?.length || 0} member{selectedProject?.teamMembers?.length !== 1 ? 's' : ''} assigned
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Current Members */}
                     <div>
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Users className="h-4 w-4 text-primary-500" />
-                            Current Members
+                        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary-600" />
+                            Current Team Members
                         </h3>
-                        {selectedProject?.members?.length > 0 ? (
-                            <div className="space-y-2.5 max-h-[30vh] overflow-y-auto pr-1 custom-scrollbar">
-                                {selectedProject.members.map((member) => (
+                        {selectedProject?.teamMembers?.length > 0 ? (
+                            <div className="grid grid-cols-1 gap-2.5 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+                                {selectedProject.teamMembers.map((member) => (
                                     <div
                                         key={member._id}
-                                        className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-100 group hover:border-danger-100 hover:bg-white transition-all duration-200"
+                                        className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-primary-200 hover:shadow-sm transition-all duration-200"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
+                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 text-sm font-bold shadow-sm">
                                                 {member.name?.charAt(0) || '?'}
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-gray-900 text-sm">{member.name}</p>
-                                                <p className="text-xs text-gray-500">{member.email}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs text-gray-500">{member.email}</p>
+                                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                                                        {member.role || 'member'}
+                                                    </Badge>
+                                                </div>
                                             </div>
                                         </div>
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => handleRemoveMember(member._id)}
-                                            className="text-gray-400 hover:text-danger-600 hover:bg-danger-50 transition-colors opacity-0 group-hover:opacity-100 rounded-lg p-2"
+                                            disabled={isUpdatingMembers}
+                                            className="text-gray-400 hover:text-danger-600 hover:bg-danger-50 transition-colors rounded-lg p-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Remove member"
                                         >
-                                            <UserMinus className="h-4 w-4" />
+                                            {isUpdatingMembers ? (
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-danger-600"></div>
+                                            ) : (
+                                                <UserMinus className="h-4 w-4" />
+                                            )}
                                         </Button>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
-                                <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                                <p className="text-sm text-gray-500 font-medium">No members added yet</p>
+                            <div className="p-6 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-500 font-medium">No team members yet</p>
+                                <p className="text-xs text-gray-400 mt-1">Add members from the list below</p>
                             </div>
                         )}
                     </div>
 
-                    <div className="pt-6 border-t border-gray-100">
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <UserPlus className="h-4 w-4 text-success-500" />
-                            Add New Members
+                    {/* Add New Members */}
+                    <div className="pt-4 border-t border-gray-200">
+                        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                            <UserPlus className="h-4 w-4 text-success-600" />
+                            Add Team Members
                         </h3>
-                        <div className="space-y-2.5 max-h-[35vh] overflow-y-auto pr-1 custom-scrollbar">
+
+                        {/* Search Bar */}
+                        <div className="mb-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search users by name or email..."
+                                    value={memberSearchTerm}
+                                    onChange={(e) => setMemberSearchTerm(e.target.value)}
+                                    disabled={isUpdatingMembers}
+                                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Bulk Selection Indicator */}
+                        {selectedUsersToAdd.length > 0 && (
+                            <div className="mb-4 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-primary-700">
+                                            {selectedUsersToAdd.length} user{selectedUsersToAdd.length !== 1 ? 's' : ''} selected
+                                        </span>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleBulkAddMembers}
+                                        disabled={isUpdatingMembers}
+                                        className="bg-primary-600 hover:bg-primary-700 text-white text-xs py-1.5 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isUpdatingMembers ? (
+                                            <span className="flex items-center gap-2">
+                                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                                Adding...
+                                            </span>
+                                        ) : (
+                                            'Add Selected'
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Available Users List */}
+                        <div className="grid grid-cols-1 gap-2.5 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                             {users
                                 .filter(user => !isMember(selectedProject, user._id))
+                                .filter(user =>
+                                    user.name?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+                                    user.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
+                                )
                                 .map((user) => (
                                     <div
                                         key={user._id}
-                                        className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-gray-100 hover:border-primary-100 hover:shadow-sm transition-all duration-200"
+                                        className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${isUpdatingMembers ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${selectedUsersToAdd.includes(user._id)
+                                            ? 'bg-primary-50 border-primary-300 shadow-sm'
+                                            : 'bg-white border-gray-200 hover:border-primary-200 hover:shadow-sm'
+                                            }`}
+                                        onClick={() => {
+                                            if (isUpdatingMembers) return;
+                                            setSelectedUsersToAdd(prev =>
+                                                prev.includes(user._id)
+                                                    ? prev.filter(id => id !== user._id)
+                                                    : [...prev, user._id]
+                                            );
+                                        }}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xs font-bold">
+                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${selectedUsersToAdd.includes(user._id)
+                                                ? 'bg-primary-600 text-white'
+                                                : 'bg-gray-100 text-gray-600'
+                                                }`}>
                                                 {user.name?.charAt(0) || '?'}
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-gray-900 text-sm">{user.name}</p>
-                                                <p className="text-xs text-gray-500">{user.email}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs text-gray-500">{user.email}</p>
+                                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                                                        {user.role || 'member'}
+                                                    </Badge>
+                                                </div>
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => handleAddMember(user._id)}
-                                            className="rounded-lg h-9 w-9 p-0 flex items-center justify-center hover:bg-primary-50 hover:text-primary-600 border border-gray-100 transition-colors"
-                                            title="Add to project"
-                                        >
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedUsersToAdd.includes(user._id)
+                                            ? 'bg-primary-600 border-primary-600'
+                                            : 'border-gray-300 hover:border-primary-400'
+                                            }`}>
+                                            {selectedUsersToAdd.includes(user._id) && (
+                                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
-                            {users.filter(user => !isMember(selectedProject, user._id)).length === 0 && (
-                                <p className="text-center text-sm text-gray-400 py-4 italic">No more users available to add</p>
-                            )}
+                            {users
+                                .filter(user => !isMember(selectedProject, user._id))
+                                .filter(user =>
+                                    user.name?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+                                    user.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
+                                ).length === 0 && (
+                                    <div className="p-6 text-center">
+                                        <Search className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                        <p className="text-sm text-gray-500 font-medium">
+                                            {memberSearchTerm ? 'No users match your search' : 'No more users available to add'}
+                                        </p>
+                                    </div>
+                                )}
                         </div>
                     </div>
                 </div>
-                <div className="flex pt-6 mt-2">
+                <div className="flex gap-3 pt-6 mt-2 border-t border-gray-200">
                     <Button
+                        variant="secondary"
                         onClick={() => setShowMemberModal(false)}
-                        className="w-full rounded-xl"
+                        className="flex-1 rounded-xl"
                     >
-                        Done
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={async () => {
+                            // Add selected members before closing
+                            if (selectedUsersToAdd.length > 0) {
+                                await handleBulkAddMembers();
+                            }
+                            setShowMemberModal(false);
+                        }}
+                        disabled={isUpdatingMembers}
+                        className="flex-1 rounded-xl shadow-lg shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isUpdatingMembers ? (
+                            <span className="flex items-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Adding...
+                            </span>
+                        ) : (
+                            'Done'
+                        )}
                     </Button>
                 </div>
             </Modal>

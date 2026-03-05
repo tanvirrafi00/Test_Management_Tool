@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
-import { testCasesAPI, projectsAPI, authAPI } from '../../lib/api';
+import { testCasesAPI, projectsAPI, authAPI, featuresAPI } from '../../lib/api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
@@ -24,17 +24,20 @@ import {
     ChevronUp,
     Folder,
     AlertTriangle,
-    Clock
+    Clock,
+    Layers
 } from 'lucide-react';
 
 export default function TestCases() {
     const [testCases, setTestCases] = useState([]);
     const [projects, setProjects] = useState([]);
+    const [features, setFeatures] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [projectFilter, setProjectFilter] = useState('all');
+    const [featureFilter, setFeatureFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [priorityFilter, setPriorityFilter] = useState('all');
     const [assignedFilter, setAssignedFilter] = useState('all');
@@ -51,6 +54,7 @@ export default function TestCases() {
         description: '',
         preconditions: '',
         projectId: '',
+        featureId: '',
         priority: 'medium',
         status: 'ready',
         assignedTo: '',
@@ -79,8 +83,16 @@ export default function TestCases() {
     useEffect(() => {
         fetchTestCases();
         fetchProjects();
+        fetchFeatures();
         fetchUsers();
     }, []);
+
+    // Fetch features when project changes
+    useEffect(() => {
+        if (projectFilter !== 'all') {
+            fetchFeatures(projectFilter);
+        }
+    }, [projectFilter]);
 
     const fetchTestCases = async () => {
         try {
@@ -104,6 +116,16 @@ export default function TestCases() {
         }
     };
 
+    const fetchFeatures = async (projectId = 'all') => {
+        try {
+            const params = projectId !== 'all' ? { project: projectId } : {};
+            const response = await featuresAPI.getAll(params);
+            setFeatures(response.data.data || []);
+        } catch (error) {
+            console.error('Error fetching features:', error);
+        }
+    };
+
     const fetchUsers = async () => {
         try {
             const response = await authAPI.getUsers();
@@ -118,10 +140,11 @@ export default function TestCases() {
         const matchesSearch = testCase.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             testCase.description?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesProject = projectFilter === 'all' || testCase.projectId === projectFilter;
+        const matchesFeature = featureFilter === 'all' || testCase.feature === featureFilter;
         const matchesStatus = statusFilter === 'all' || testCase.status === statusFilter;
         const matchesPriority = priorityFilter === 'all' || testCase.priority === priorityFilter;
         const matchesAssigned = assignedFilter === 'all' || testCase.assignedTo === assignedFilter;
-        return matchesSearch && matchesProject && matchesStatus && matchesPriority && matchesAssigned;
+        return matchesSearch && matchesProject && matchesFeature && matchesStatus && matchesPriority && matchesAssigned;
     });
 
     // Check if user can edit/delete test case
@@ -175,6 +198,9 @@ export default function TestCases() {
         }
         if (!formData.projectId) {
             errors.projectId = 'Project is required';
+        }
+        if (!formData.featureId) {
+            errors.featureId = 'Feature is required';
         }
         formData.steps.forEach((step, index) => {
             if (!step.action.trim()) {
@@ -259,6 +285,7 @@ export default function TestCases() {
             description: testCase.description || '',
             preconditions: testCase.preconditions || '',
             projectId: testCase.project?._id || testCase.projectId || '',
+            featureId: testCase.feature?._id || testCase.feature || '',
             priority: testCase.priority || 'medium',
             status: testCase.status || 'ready',
             assignedTo: testCase.assignedTo?._id || testCase.assignedTo || '',
@@ -287,6 +314,7 @@ export default function TestCases() {
             description: '',
             preconditions: '',
             projectId: '',
+            featureId: '',
             priority: 'medium',
             status: 'ready',
             assignedTo: '',
@@ -352,7 +380,7 @@ export default function TestCases() {
 
                 {/* Filters */}
                 <Card className="p-4 bg-gray-50/50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <input
@@ -371,6 +399,16 @@ export default function TestCases() {
                             <option value="all">All Projects</option>
                             {projects.map(project => (
                                 <option key={project._id} value={project._id}>{project.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={featureFilter}
+                            onChange={(e) => setFeatureFilter(e.target.value)}
+                            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 shadow-sm"
+                        >
+                            <option value="all">All Features</option>
+                            {features.filter(f => projectFilter === 'all' || f.project._id === projectFilter).map(feature => (
+                                <option key={feature._id} value={feature._id}>{feature.name}</option>
                             ))}
                         </select>
                         <select
@@ -648,6 +686,15 @@ export default function TestCases() {
                                     error={formErrors.projectId}
                                     options={projects.map(p => ({ label: p.name, value: p._id }))}
                                     placeholder="Select project"
+                                />
+                                <Select
+                                    label="Feature *"
+                                    name="featureId"
+                                    value={formData.featureId}
+                                    onChange={handleInputChange}
+                                    error={formErrors.featureId}
+                                    options={features.filter(f => formData.projectId === 'all' || f.project._id === formData.projectId).map(f => ({ label: f.name, value: f._id }))}
+                                    placeholder="Select feature"
                                 />
                                 <Select
                                     label="Priority"

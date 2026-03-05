@@ -62,6 +62,11 @@ const testCaseSchema = new mongoose.Schema({
         ref: 'Project',
         required: true
     },
+    feature: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Feature',
+        required: true
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

@@ -38,6 +38,11 @@ const testPlanSchema = new mongoose.Schema({
         ref: 'Project',
         required: true
     },
+    feature: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Feature',
+        required: true
+    },
     testCases: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'TestCase'

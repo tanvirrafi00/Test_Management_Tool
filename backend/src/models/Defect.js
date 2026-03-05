@@ -65,6 +65,11 @@ const defectSchema = new mongoose.Schema({
         ref: 'Project',
         required: true
     },
+    feature: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Feature',
+        default: null
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
+const featureRoutes = require('./routes/featureRoutes');
 const testCaseRoutes = require('./routes/testCaseRoutes');
 const testPlanRoutes = require('./routes/testPlanRoutes');
 const executionRoutes = require('./routes/executionRoutes');
@@ -40,6 +41,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/testflow'
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/features', featureRoutes);
 app.use('/api/testcases', testCaseRoutes);
 app.use('/api/testplans', testPlanRoutes);
 app.use('/api/executions', executionRoutes);

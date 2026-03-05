@@ -169,25 +169,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center gap-3 p-4 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors">
-            <Plus className="h-5 w-5 text-primary-600" />
-            <span className="font-medium text-gray-900">Create Project</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-            <UserPlus className="h-5 w-5 text-emerald-600" />
-            <span className="font-medium text-gray-900">Add User</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors">
-            <Settings className="h-5 w-5 text-violet-600" />
-            <span className="font-medium text-gray-900">System Settings</span>
-          </button>
-        </div>
-      </Card>
-
       {/* View Reports Button */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
         <div className="flex items-center justify-between">
@@ -278,25 +259,6 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
-
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center gap-3 p-4 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors">
-            <Plus className="h-5 w-5 text-primary-600" />
-            <span className="font-medium text-gray-900">Create Test Plan</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-            <Users className="h-5 w-5 text-emerald-600" />
-            <span className="font-medium text-gray-900">Assign Test Cases</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">
-            <BarChart3 className="h-5 w-5 text-amber-600" />
-            <span className="font-medium text-gray-900">View Reports</span>
-          </button>
-        </div>
-      </Card>
 
       {/* View Reports Button */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
@@ -389,25 +351,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center gap-3 p-4 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors">
-            <Plus className="h-5 w-5 text-primary-600" />
-            <span className="font-medium text-gray-900">Create Test Case</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
-            <PlayCircle className="h-5 w-5 text-indigo-600" />
-            <span className="font-medium text-gray-900">Execute Tests</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors">
-            <AlertTriangle className="h-5 w-5 text-rose-600" />
-            <span className="font-medium text-gray-900">Log Defect</span>
-          </button>
-        </div>
-      </Card>
-
       {/* View Reports Button */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
         <div className="flex items-center justify-between">
@@ -499,21 +442,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors">
-            <AlertTriangle className="h-5 w-5 text-rose-600" />
-            <span className="font-medium text-gray-900">View Assigned Defects</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-            <CheckCircle className="h-5 w-5 text-emerald-600" />
-            <span className="font-medium text-gray-900">Update Defect Status</span>
-          </button>
-        </div>
-      </Card>
-
       {/* View Reports Button */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
         <div className="flex items-center justify-between">
@@ -599,21 +527,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-            <span className="font-medium text-gray-900">View Reports</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-            <TrendingUp className="h-5 w-5 text-emerald-600" />
-            <span className="font-medium text-gray-900">View Trends</span>
-          </button>
-        </div>
-      </Card>
-
       {/* View Reports Button */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
         <div className="flex items-center justify-between">
@@ -698,25 +611,6 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
-
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center gap-3 p-4 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors">
-            <Plus className="h-5 w-5 text-primary-600" />
-            <span className="font-medium text-gray-900">Create Test Case</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
-            <GitBranch className="h-5 w-5 text-indigo-600" />
-            <span className="font-medium text-gray-900">Run Automation</span>
-          </button>
-          <button className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors">
-            <AlertTriangle className="h-5 w-5 text-rose-600" />
-            <span className="font-medium text-gray-900">Log Defect</span>
-          </button>
-        </div>
-      </Card>
 
       {/* View Reports Button */}
       <Card className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
