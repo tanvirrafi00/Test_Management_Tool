@@ -32,7 +32,7 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/auth/login';
+            // Remove automatic redirect to allow application logic to handle it
         }
         return Promise.reject(error);
     }
@@ -102,14 +102,21 @@ export const defectsAPI = {
     delete: (id) => api.delete(`/defects/${id}`),
     assign: (id, data) => api.put(`/defects/${id}/assign`, data),
     updateStatus: (id, data) => api.put(`/defects/${id}/status`, data),
+    addComment: (id, data) => api.post(`/defects/${id}/comments`, data),
 };
 
 // Dashboard API
 export const dashboardAPI = {
     getStats: (params) => api.get('/dashboard/stats', { params }),
+    getProjects: (params) => api.get('/dashboard/projects', { params }),
     getRecentActivity: (params) => api.get('/dashboard/recent-activity', { params }),
     getTesterWise: (params) => api.get('/dashboard/tester-wise', { params }),
     getReleaseWise: (params) => api.get('/dashboard/release-wise', { params }),
+    exportReport: (reportType, format = 'csv', params = {}) => api.get(`/dashboard/reports/${reportType}/${format}`, {
+        params,
+        responseType: format === 'pdf' ? 'blob' : 'json'
+    }),
 };
 
 export default api;
+

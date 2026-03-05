@@ -7,6 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 import {
     Plus,
     Edit2,
@@ -17,8 +19,9 @@ import {
     X,
     UserPlus,
     UserMinus,
-    Calendar,
-    FolderKanban
+    Folder,
+    AlertTriangle,
+    Calendar
 } from 'lucide-react';
 
 export default function Projects() {
@@ -96,7 +99,8 @@ export default function Projects() {
     // Check if user can edit/delete project
     const canEditProject = (project) => {
         if (!currentUser) return false;
-        return currentUser.role === 'Admin' || project.createdBy === currentUser._id;
+        // Admin and QA Lead have full project management rights
+        return currentUser.role === 'admin' || currentUser.role === 'qa_lead' || project.createdBy === currentUser._id;
     };
 
     // Handle form input
@@ -206,7 +210,7 @@ export default function Projects() {
 
     // Check if user is a member
     const isMember = (project, userId) => {
-        return project.members?.some(member => member._id === userId);
+        return project?.members?.some(member => member._id === userId);
     };
 
     if (loading) {
@@ -228,10 +232,12 @@ export default function Projects() {
                         <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
                         <p className="text-gray-600 mt-1">Manage your testing projects</p>
                     </div>
-                    <Button onClick={() => setShowCreateModal(true)}>
-                        <Plus className="h-5 w-5 mr-2" />
-                        New Project
-                    </Button>
+                    {(currentUser?.role === 'admin' || currentUser?.role === 'qa_lead') && (
+                        <Button onClick={() => setShowCreateModal(true)}>
+                            <Plus className="h-5 w-5 mr-2" />
+                            New Project
+                        </Button>
+                    )}
                 </div>
 
                 {/* Error Message */}
@@ -242,31 +248,30 @@ export default function Projects() {
                 )}
 
                 {/* Filters */}
-                <Card className="p-4 bg-gray-50/50">
+                <Card className="p-4 bg-gray-50/50 border-gray-100 shadow-sm">
                     <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <div className="flex-1 relative group">
+                            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Search projects..."
+                                placeholder="Search projects by name or description..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow shadow-sm"
+                                className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
                             />
                         </div>
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Filter className="h-4 w-4 text-gray-400" />
-                            </div>
-                            <select
+                        <div className="w-full sm:w-48">
+                            <Select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="pl-10 pr-8 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none shadow-sm min-w-[150px]"
-                            >
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="archived">Archived</option>
-                            </select>
+                                options={[
+                                    { label: 'All Status', value: 'all' },
+                                    { label: 'Active', value: 'active' },
+                                    { label: 'Archived', value: 'archived' },
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5"
+                            />
                         </div>
                     </div>
                 </Card>
@@ -274,7 +279,7 @@ export default function Projects() {
                 {/* Projects Grid */}
                 {filteredProjects.length === 0 ? (
                     <Card className="p-12 text-center bg-gray-50/50 border-dashed border-2">
-                        <FolderKanban className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                        <Folder className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-600 font-medium">
                             {searchTerm || statusFilter !== 'all'
                                 ? 'No projects match your search criteria'
@@ -312,7 +317,7 @@ export default function Projects() {
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                                    {canEditProject(project) ? (
+                                    {(currentUser?.role === 'admin' || currentUser?.role === 'qa_lead') ? (
                                         <>
                                             <Button
                                                 variant="secondary"
@@ -332,18 +337,20 @@ export default function Projects() {
                                             >
                                                 <Edit2 className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => openDeleteModal(project)}
-                                                className="px-2 text-danger-600 hover:text-danger-700 hover:bg-danger-50"
-                                                title="Delete Project"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {currentUser?.role === 'admin' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => openDeleteModal(project)}
+                                                    className="px-2 text-danger-600 hover:text-danger-700 hover:bg-danger-50"
+                                                    title="Delete Project"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                         </>
                                     ) : (
-                                        <div className="text-xs text-gray-400 italic py-1.5">View only access</div>
+                                        <div className="text-xs text-gray-400 italic py-1.5 w-full text-center">Assigned View Only</div>
                                     )}
                                 </div>
                             </Card>
@@ -353,227 +360,234 @@ export default function Projects() {
             </div>
 
             {/* Create Project Modal */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Create New Project</h2>
-                            <button
-                                onClick={() => setShowCreateModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreateProject}>
-                            <Input
-                                label="Project Name"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleInputChange}
-                                error={formErrors.name}
-                                placeholder="Enter project name"
-                            />
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Description
-                                </label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter project description"
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.description && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.description}</p>
-                                )}
-                            </div>
-                            {formErrors.submit && (
-                                <div className="mb-4 text-sm text-danger-600">{formErrors.submit}</div>
-                            )}
-                            <div className="flex gap-3">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => setShowCreateModal(false)}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" className="flex-1">
-                                    Create Project
-                                </Button>
-                            </div>
-                        </form>
-                    </Card>
-                </div>
-            )}
+            <Modal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                title="Create New Project"
+                size="md"
+            >
+                <form onSubmit={handleCreateProject}>
+                    <Input
+                        label="Project Name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        error={formErrors.name}
+                        placeholder="e.g. Mobile App Redesign"
+                    />
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Description
+                        </label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            placeholder="Briefly describe the purpose of this project..."
+                            rows={4}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
+                        {formErrors.description && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.description}</p>
+                        )}
+                    </div>
+                    {formErrors.submit && (
+                        <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>
+                    )}
+                    <div className="flex gap-3 pt-4 border-t border-gray-100 mt-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setShowCreateModal(false)}
+                            className="flex-1 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 rounded-xl shadow-lg shadow-primary-500/20">
+                            Create Project
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Edit Project Modal */}
-            {showEditModal && selectedProject && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Edit Project</h2>
-                            <button
-                                onClick={() => setShowEditModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleEditProject}>
-                            <Input
-                                label="Project Name"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleInputChange}
-                                error={formErrors.name}
-                                placeholder="Enter project name"
-                            />
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Description
-                                </label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter project description"
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.description && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.description}</p>
-                                )}
-                            </div>
-                            {formErrors.submit && (
-                                <div className="mb-4 text-sm text-danger-600">{formErrors.submit}</div>
-                            )}
-                            <div className="flex gap-3">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => setShowEditModal(false)}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" className="flex-1">
-                                    Save Changes
-                                </Button>
-                            </div>
-                        </form>
-                    </Card>
-                </div>
-            )}
+            <Modal
+                isOpen={showEditModal && !!selectedProject}
+                onClose={() => setShowEditModal(false)}
+                title="Edit Project"
+                size="md"
+            >
+                <form onSubmit={handleEditProject}>
+                    <Input
+                        label="Project Name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        error={formErrors.name}
+                        placeholder="Enter project name"
+                    />
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Description
+                        </label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            placeholder="Enter project description"
+                            rows={4}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
+                        {formErrors.description && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.description}</p>
+                        )}
+                    </div>
+                    {formErrors.submit && (
+                        <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>
+                    )}
+                    <div className="flex gap-3 pt-4 border-t border-gray-100">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setShowEditModal(false)}
+                            className="flex-1 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 rounded-xl shadow-lg shadow-primary-500/20">
+                            Save Changes
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Delete Confirmation Modal */}
-            {showDeleteModal && selectedProject && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Delete Project</h2>
-                            <button
-                                onClick={() => setShowDeleteModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="mb-6">
-                            <p className="text-gray-700">
-                                Are you sure you want to delete the project <strong>"{selectedProject.name}"</strong>?
-                            </p>
-                            <p className="text-sm text-gray-500 mt-2">
-                                This action will soft delete the project and all associated data.
-                            </p>
-                        </div>
-                        <div className="flex gap-3">
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowDeleteModal(false)}
-                                className="flex-1"
-                            >
-                                Cancel
-                            </Button>
-                            <Button variant="danger" onClick={handleDeleteProject} className="flex-1">
-                                Delete Project
-                            </Button>
-                        </div>
-                    </Card>
+            <Modal
+                isOpen={showDeleteModal && !!selectedProject}
+                onClose={() => setShowDeleteModal(false)}
+                title="Delete Project"
+                size="sm"
+            >
+                <div className="mb-6 mt-2">
+                    <p className="text-gray-700 leading-relaxed">
+                        Are you sure you want to delete the project <strong className="text-gray-900">"{selectedProject?.name}"</strong>?
+                    </p>
+                    <p className="text-sm text-gray-500 mt-3 p-3 bg-danger-50 rounded-lg border border-danger-100 flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-danger-500 flex-shrink-0 mt-0.5" />
+                        This action will soft delete the project and all associated data.
+                    </p>
                 </div>
-            )}
+                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setShowDeleteModal(false)}
+                        className="flex-1 rounded-xl"
+                    >
+                        Cancel
+                    </Button>
+                    <Button variant="danger" onClick={handleDeleteProject} className="flex-1 rounded-xl shadow-lg shadow-danger-500/10">
+                        Delete Project
+                    </Button>
+                </div>
+            </Modal>
 
             {/* Member Management Modal */}
-            {showMemberModal && selectedProject && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-                        <div className="flex items-center justify-between mb-6 p-6 border-b border-gray-200">
-                            <h2 className="text-xl font-bold text-gray-900">Manage Members</h2>
-                            <button
-                                onClick={() => setShowMemberModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-6">
-                            <h3 className="text-sm font-medium text-gray-700 mb-3">Current Members</h3>
-                            {selectedProject.members?.length > 0 ? (
-                                <div className="space-y-2 mb-6">
-                                    {selectedProject.members.map((member) => (
-                                        <div
-                                            key={member._id}
-                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                                        >
-                                            <div>
-                                                <p className="font-medium text-gray-900">{member.name}</p>
-                                                <p className="text-sm text-gray-500">{member.email}</p>
+            <Modal
+                isOpen={showMemberModal && !!selectedProject}
+                onClose={() => setShowMemberModal(false)}
+                title="Manage Project Members"
+                size="md"
+            >
+                <div className="space-y-6">
+                    <div>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary-500" />
+                            Current Members
+                        </h3>
+                        {selectedProject?.members?.length > 0 ? (
+                            <div className="space-y-2.5 max-h-[30vh] overflow-y-auto pr-1 custom-scrollbar">
+                                {selectedProject.members.map((member) => (
+                                    <div
+                                        key={member._id}
+                                        className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-100 group hover:border-danger-100 hover:bg-white transition-all duration-200"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
+                                                {member.name?.charAt(0) || '?'}
                                             </div>
-                                            <Button
-                                                variant="danger"
-                                                size="sm"
-                                                onClick={() => handleRemoveMember(member._id)}
-                                            >
-                                                <UserMinus className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-gray-500 mb-6">No members yet</p>
-                            )}
-
-                            <h3 className="text-sm font-medium text-gray-700 mb-3">Add Members</h3>
-                            <div className="space-y-2">
-                                {users
-                                    .filter(user => !isMember(selectedProject, user._id))
-                                    .map((user) => (
-                                        <div
-                                            key={user._id}
-                                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                                        >
                                             <div>
-                                                <p className="font-medium text-gray-900">{user.name}</p>
-                                                <p className="text-sm text-gray-500">{user.email}</p>
+                                                <p className="font-semibold text-gray-900 text-sm">{member.name}</p>
+                                                <p className="text-xs text-gray-500">{member.email}</p>
                                             </div>
-                                            <Button
-                                                variant="success"
-                                                size="sm"
-                                                onClick={() => handleAddMember(user._id)}
-                                            >
-                                                <UserPlus className="h-4 w-4" />
-                                            </Button>
                                         </div>
-                                    ))}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRemoveMember(member._id)}
+                                            className="text-gray-400 hover:text-danger-600 hover:bg-danger-50 transition-colors opacity-0 group-hover:opacity-100 rounded-lg p-2"
+                                            title="Remove member"
+                                        >
+                                            <UserMinus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
                             </div>
+                        ) : (
+                            <div className="p-8 text-center bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
+                                <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-500 font-medium">No members added yet</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <UserPlus className="h-4 w-4 text-success-500" />
+                            Add New Members
+                        </h3>
+                        <div className="space-y-2.5 max-h-[35vh] overflow-y-auto pr-1 custom-scrollbar">
+                            {users
+                                .filter(user => !isMember(selectedProject, user._id))
+                                .map((user) => (
+                                    <div
+                                        key={user._id}
+                                        className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-gray-100 hover:border-primary-100 hover:shadow-sm transition-all duration-200"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xs font-bold">
+                                                {user.name?.charAt(0) || '?'}
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-gray-900 text-sm">{user.name}</p>
+                                                <p className="text-xs text-gray-500">{user.email}</p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => handleAddMember(user._id)}
+                                            className="rounded-lg h-9 w-9 p-0 flex items-center justify-center hover:bg-primary-50 hover:text-primary-600 border border-gray-100 transition-colors"
+                                            title="Add to project"
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            {users.filter(user => !isMember(selectedProject, user._id)).length === 0 && (
+                                <p className="text-center text-sm text-gray-400 py-4 italic">No more users available to add</p>
+                            )}
                         </div>
-                    </Card>
+                    </div>
                 </div>
-            )}
+                <div className="flex pt-6 mt-2">
+                    <Button
+                        onClick={() => setShowMemberModal(false)}
+                        className="w-full rounded-xl"
+                    >
+                        Done
+                    </Button>
+                </div>
+            </Modal>
         </DashboardLayout>
     );
 }

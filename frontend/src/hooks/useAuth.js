@@ -9,35 +9,41 @@ export function useAuth() {
     const pathname = usePathname();
 
     useEffect(() => {
-        // Skip fetching user on auth pages to prevent infinite loops
-        if (pathname?.startsWith('/auth/')) {
-            setLoading(false);
-            return;
-        }
-
         // Fetch user data from backend to verify authentication
         const fetchUser = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setLoading(false);
+                return;
+            }
+
             try {
                 const response = await authAPI.getMe();
                 setUser(response.data.data);
             } catch (error) {
                 // User is not authenticated, clear any stored data
                 setUser(null);
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
             } finally {
                 setLoading(false);
             }
         };
 
         fetchUser();
-    }, [pathname]);
+    }, []);
 
     const login = async (email, password) => {
         try {
             const response = await authAPI.login({ email, password });
-            const { user } = response.data.data;
+            const { user, token } = response.data.data;
             setUser(user);
 
-            return { success: true };
+            // Save to localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
+
+            return { success: true, user };
         } catch (error) {
             return {
                 success: false,
@@ -49,10 +55,14 @@ export function useAuth() {
     const register = async (name, email, password) => {
         try {
             const response = await authAPI.register({ name, email, password });
-            const { user } = response.data.data;
+            const { user, token } = response.data.data;
             setUser(user);
 
-            return { success: true };
+            // Save to localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
+
+            return { success: true, user };
         } catch (error) {
             return {
                 success: false,
@@ -64,17 +74,18 @@ export function useAuth() {
     const logout = async () => {
         try {
             await authAPI.logout();
+        } finally {
+            // Always clear everything locally
             setUser(null);
-            router.push('/auth/login');
-        } catch (error) {
-            // Even if logout fails, clear user state and redirect
-            setUser(null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
             router.push('/auth/login');
         }
     };
 
     const updateUser = (updatedUser) => {
         setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
     };
 
     return {

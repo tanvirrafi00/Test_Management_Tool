@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
 import { LogIn, Mail, Lock } from 'lucide-react';
@@ -9,7 +9,7 @@ import { Input } from '../../../components/ui/Input';
 
 export default function Login() {
     const router = useRouter();
-    const { login } = useAuth();
+    const { login, isAuthenticated, loading: authLoading } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -17,6 +17,13 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            router.push('/dashboard');
+        }
+    }, [isAuthenticated, authLoading, router]);
 
     const handleChange = (e) => {
         setFormData({
@@ -41,7 +48,13 @@ export default function Login() {
             const result = await login(formData.email, formData.password);
 
             if (result.success) {
-                router.push('/dashboard');
+                // Determine landing page based on role if needed
+                const user = result.user;
+                if (user?.role === 'admin') {
+                    router.push('/dashboard');
+                } else {
+                    router.push('/dashboard');
+                }
             } else {
                 setError(result.message);
             }

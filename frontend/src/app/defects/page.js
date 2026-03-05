@@ -7,6 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 import {
     Plus,
     Edit2,
@@ -21,7 +23,9 @@ import {
     PlayCircle,
     ChevronDown,
     ChevronUp,
-    ArrowRight
+    ArrowRight,
+    MessageSquare,
+    Send
 } from 'lucide-react';
 
 export default function Defects() {
@@ -46,6 +50,8 @@ export default function Defects() {
     const [selectedDefect, setSelectedDefect] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
     const [expandedDefects, setExpandedDefects] = useState({});
+    const [newComment, setNewComment] = useState('');
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -152,8 +158,16 @@ export default function Defects() {
 
     // Check if user can edit/delete defect
     const canEditDefect = (defect) => {
-        if (!currentUser) return false;
-        return currentUser.role === 'Admin' || defect.createdBy === currentUser._id;
+        if (!currentUser || !defect) return false;
+        // Admins and QA Leads have full edit rights
+        if (['admin', 'qa_lead'].includes(currentUser.role)) return true;
+        // QA Engineers and Automation can edit defects they created
+        const creatorId = defect.createdBy?._id || defect.createdBy;
+        if (['qa_engineer', 'qa_automation'].includes(currentUser.role) && creatorId === currentUser._id) return true;
+        // Developers can edit (to update status/comments) if assigned
+        const assignedId = defect.assignedTo?._id || defect.assignedTo;
+        if (currentUser.role === 'developer' && assignedId === currentUser._id) return true;
+        return false;
     };
 
     // Handle form input
@@ -246,6 +260,25 @@ export default function Defects() {
             fetchDefects();
         } catch (error) {
             setError(error.response?.data?.message || 'Failed to update defect status');
+        }
+    };
+
+    // Add comment
+    const handleAddComment = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+
+        try {
+            setIsSubmittingComment(true);
+            const response = await defectsAPI.addComment(selectedDefect._id, { text: newComment });
+            setSelectedDefect(response.data.data);
+            setNewComment('');
+            // Update the defects list to show the new comment count
+            fetchDefects();
+        } catch (error) {
+            setError(error.response?.data?.message || 'Failed to add comment');
+        } finally {
+            setIsSubmittingComment(false);
         }
     };
 
@@ -389,6 +422,37 @@ export default function Defects() {
         );
     };
 
+    const getStatusVariant = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'fixed':
+            case 'closed': return 'success';
+            case 'open': return 'danger';
+            case 'in_progress':
+            case 'retest': return 'warning';
+            default: return 'secondary';
+        }
+    };
+
+    const getSeverityVariant = (severity) => {
+        switch (severity?.toLowerCase()) {
+            case 'critical': return 'danger';
+            case 'major': return 'warning';
+            case 'minor': return 'info';
+            case 'trivial': return 'secondary';
+            default: return 'secondary';
+        }
+    };
+
+    const getPriorityVariant = (priority) => {
+        switch (priority?.toLowerCase()) {
+            case 'critical':
+            case 'high': return 'danger';
+            case 'medium': return 'warning';
+            case 'low': return 'secondary';
+            default: return 'secondary';
+        }
+    };
+
     // Get next status in flow
     const getNextStatus = (currentStatus) => {
         const currentIndex = statusFlow.indexOf(currentStatus);
@@ -417,10 +481,12 @@ export default function Defects() {
                         <h1 className="text-2xl font-bold text-gray-900">Defects</h1>
                         <p className="text-gray-600 mt-1">Track and manage defects</p>
                     </div>
-                    <Button onClick={() => setShowCreateModal(true)}>
-                        <Plus className="h-5 w-5 mr-2" />
-                        New Defect
-                    </Button>
+                    {currentUser?.role !== 'product_manager' && (
+                        <Button onClick={() => setShowCreateModal(true)}>
+                            <Plus className="h-5 w-5 mr-2" />
+                            New Defect
+                        </Button>
+                    )}
                 </div>
 
                 {/* Error Message */}
@@ -431,61 +497,63 @@ export default function Defects() {
                 )}
 
                 {/* Filters */}
-                <Card className="p-4">
-                    <div className="flex flex-col lg:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Card className="p-5 border-none shadow-sm bg-white/50 backdrop-blur-sm rounded-2xl">
+                    <div className="flex flex-col lg:flex-row gap-5">
+                        <div className="flex-1 relative group">
+                            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Search defects..."
+                                placeholder="Search defects by title or description..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
                             />
                         </div>
-                        <select
-                            value={projectFilter}
-                            onChange={(e) => setProjectFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Projects</option>
-                            {projects.map(project => (
-                                <option key={project._id} value={project._id}>{project.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={severityFilter}
-                            onChange={(e) => setSeverityFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Severities</option>
-                            <option value="trivial">Trivial</option>
-                            <option value="minor">Minor</option>
-                            <option value="major">Major</option>
-                            <option value="critical">Critical</option>
-                        </select>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="open">Open</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="fixed">Fixed</option>
-                            <option value="retest">Retest</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                        <select
-                            value={assignedFilter}
-                            onChange={(e) => setAssignedFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Assignees</option>
-                            {users.map(user => (
-                                <option key={user._id} value={user._id}>{user.name}</option>
-                            ))}
-                        </select>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-[2]">
+                            <Select
+                                value={projectFilter}
+                                onChange={(e) => setProjectFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Projects', value: 'all' },
+                                    ...projects.map(p => ({ label: p.name, value: p._id }))
+                                ]}
+                                className="rounded-xl h-[42px]"
+                            />
+                            <Select
+                                value={severityFilter}
+                                onChange={(e) => setSeverityFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Severities', value: 'all' },
+                                    { label: 'Trivial', value: 'trivial' },
+                                    { label: 'Minor', value: 'minor' },
+                                    { label: 'Major', value: 'major' },
+                                    { label: 'Critical', value: 'critical' }
+                                ]}
+                                className="rounded-xl h-[42px]"
+                            />
+                            <Select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Status', value: 'all' },
+                                    { label: 'Open', value: 'open' },
+                                    { label: 'In Progress', value: 'in_progress' },
+                                    { label: 'Fixed', value: 'fixed' },
+                                    { label: 'Retest', value: 'retest' },
+                                    { label: 'Closed', value: 'closed' }
+                                ]}
+                                className="rounded-xl h-[42px]"
+                            />
+                            <Select
+                                value={assignedFilter}
+                                onChange={(e) => setAssignedFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Assignees', value: 'all' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                className="rounded-xl h-[42px]"
+                            />
+                        </div>
                     </div>
                 </Card>
 
@@ -597,20 +665,24 @@ export default function Defects() {
                                                 >
                                                     View Details
                                                 </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => openAssignModal(defect)}
-                                                >
-                                                    Assign
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => openStatusModal(defect)}
-                                                >
-                                                    Update Status
-                                                </Button>
+                                                {(['admin', 'qa_lead'].includes(currentUser?.role) || (currentUser?.role === 'developer' && defect.assignedTo === currentUser?._id)) && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openAssignModal(defect)}
+                                                    >
+                                                        Assign
+                                                    </Button>
+                                                )}
+                                                {(['admin', 'qa_lead'].includes(currentUser?.role) || (currentUser?.role === 'developer' && defect.assignedTo === currentUser?._id)) && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openStatusModal(defect)}
+                                                    >
+                                                        Update Status
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -627,13 +699,15 @@ export default function Defects() {
                                             >
                                                 <Edit2 className="h-4 w-4" />
                                             </Button>
-                                            <Button
-                                                variant="danger"
-                                                size="sm"
-                                                onClick={() => openDeleteModal(defect)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {currentUser?.role === 'admin' && (
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
+                                                    onClick={() => openDeleteModal(defect)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </>
                                     )}
                                     {!expandedDefects[defect._id] && (
@@ -645,13 +719,15 @@ export default function Defects() {
                                             >
                                                 View Details
                                             </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => openAssignModal(defect)}
-                                            >
-                                                Assign
-                                            </Button>
+                                            {(['admin', 'qa_lead'].includes(currentUser?.role) || (currentUser?.role === 'developer' && defect.assignedTo === currentUser?._id)) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => openAssignModal(defect)}
+                                                >
+                                                    Assign
+                                                </Button>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -662,635 +738,626 @@ export default function Defects() {
             </div>
 
             {/* Create Defect Modal */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <Card className="w-full max-w-2xl my-8">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Create New Defect</h2>
-                            <button
-                                onClick={() => { setShowCreateModal(false); resetForm(); }}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreateDefect} className="max-h-[70vh] overflow-y-auto pr-2">
-                            <Input
-                                label="Title"
-                                name="title"
-                                value={formData.title}
+            <Modal
+                isOpen={showCreateModal}
+                onClose={() => { setShowCreateModal(false); resetForm(); }}
+                title="Create New Defect"
+                size="3xl"
+            >
+                <form onSubmit={handleCreateDefect} className="space-y-6">
+                    <Input
+                        label="Defect Title"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleInputChange}
+                        error={formErrors.title}
+                        placeholder="e.g., Login button not responding on mobile"
+                        className="rounded-xl"
+                    />
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Description
+                        </label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            placeholder="Provide a clear and concise description of the issue..."
+                            rows={3}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
+                        {formErrors.description && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium">{formErrors.description}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-warning-500" />
+                            Steps to Reproduce
+                        </label>
+                        <textarea
+                            name="stepsToReproduce"
+                            value={formData.stepsToReproduce}
+                            onChange={handleInputChange}
+                            placeholder="1. Navigate to...&#10;2. Click on...&#10;3. Observe..."
+                            rows={4}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400 font-mono"
+                        />
+                        {formErrors.stepsToReproduce && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium">{formErrors.stepsToReproduce}</p>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold text-success-700">
+                                Expected Result
+                            </label>
+                            <textarea
+                                name="expectedResult"
+                                value={formData.expectedResult}
                                 onChange={handleInputChange}
-                                error={formErrors.title}
-                                placeholder="Enter defect title"
+                                placeholder="What should have happened?"
+                                rows={2}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
                             />
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Description
-                                </label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter defect description"
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.description && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.description}</p>
-                                )}
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Steps to Reproduce
-                                </label>
-                                <textarea
-                                    name="stepsToReproduce"
-                                    value={formData.stepsToReproduce}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter steps to reproduce the defect"
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.stepsToReproduce && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.stepsToReproduce}</p>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Expected Result</label>
-                                    <textarea
-                                        name="expectedResult"
-                                        value={formData.expectedResult}
-                                        onChange={handleInputChange}
-                                        placeholder="What was expected to happen"
-                                        rows={3}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Actual Result</label>
-                                    <textarea
-                                        name="actualResult"
-                                        value={formData.actualResult}
-                                        onChange={handleInputChange}
-                                        placeholder="What actually happened"
-                                        rows={3}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
-                                    <select
-                                        name="projectId"
-                                        value={formData.projectId}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="">Select project</option>
-                                        {projects.map(project => (
-                                            <option key={project._id} value={project._id}>{project.name}</option>
-                                        ))}
-                                    </select>
-                                    {formErrors.projectId && (
-                                        <p className="mt-1 text-sm text-danger-600">{formErrors.projectId}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Severity</label>
-                                    <select
-                                        name="severity"
-                                        value={formData.severity}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="trivial">Trivial</option>
-                                        <option value="minor">Minor</option>
-                                        <option value="major">Major</option>
-                                        <option value="critical">Critical</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                                <select
-                                    name="priority"
-                                    value={formData.priority}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="critical">Critical</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Test Case (Optional)</label>
-                                    <select
-                                        name="testCaseId"
-                                        value={formData.testCaseId}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="">Select test case</option>
-                                        {testCases.map(testCase => (
-                                            <option key={testCase._id} value={testCase._id}>{testCase.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Execution (Optional)</label>
-                                    <select
-                                        name="executionId"
-                                        value={formData.executionId}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="">Select execution</option>
-                                        {executions.map(execution => (
-                                            <option key={execution._id} value={execution._id}>
-                                                {getTestCaseTitle(execution.testCaseId)} - {new Date(execution.executedAt).toLocaleDateString()}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
-                                <select
-                                    name="assignedTo"
-                                    value={formData.assignedTo}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="">Unassigned</option>
-                                    {users.map(user => (
-                                        <option key={user._id} value={user._id}>{user.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {formErrors.submit && (
-                                <div className="mb-4 text-sm text-danger-600">{formErrors.submit}</div>
-                            )}
-                            <div className="flex gap-3">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => { setShowCreateModal(false); resetForm(); }}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" className="flex-1">
-                                    Create Defect
-                                </Button>
-                            </div>
-                        </form>
-                    </Card>
-                </div>
-            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold text-danger-700">
+                                Actual Result
+                            </label>
+                            <textarea
+                                name="actualResult"
+                                value={formData.actualResult}
+                                onChange={handleInputChange}
+                                placeholder="What actually happened?"
+                                rows={2}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Select
+                            label="Project"
+                            name="projectId"
+                            value={formData.projectId}
+                            onChange={handleInputChange}
+                            error={formErrors.projectId}
+                            options={[
+                                { label: 'Select project', value: '' },
+                                ...projects.map(p => ({ label: p.name, value: p._id }))
+                            ]}
+                            className="rounded-xl"
+                        />
+                        <Select
+                            label="Severity"
+                            name="severity"
+                            value={formData.severity}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Trivial', value: 'trivial' },
+                                { label: 'Minor', value: 'minor' },
+                                { label: 'Major', value: 'major' },
+                                { label: 'Critical', value: 'critical' }
+                            ]}
+                            className="rounded-xl"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Select
+                            label="Priority"
+                            name="priority"
+                            value={formData.priority}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Low', value: 'low' },
+                                { label: 'Medium', value: 'medium' },
+                                { label: 'High', value: 'high' },
+                                { label: 'Critical', value: 'critical' }
+                            ]}
+                            className="rounded-xl"
+                        />
+                        <Select
+                            label="Assign To"
+                            name="assignedTo"
+                            value={formData.assignedTo}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Unassigned', value: '' },
+                                ...users.map(u => ({ label: u.name, value: u._id }))
+                            ]}
+                            className="rounded-xl"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Select
+                            label="Test Case (Optional)"
+                            name="testCaseId"
+                            value={formData.testCaseId}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Select test case', value: '' },
+                                ...testCases.map(tc => ({ label: tc.title, value: tc._id }))
+                            ]}
+                            className="rounded-xl"
+                        />
+                        <Select
+                            label="Execution (Optional)"
+                            name="executionId"
+                            value={formData.executionId}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Select execution', value: '' },
+                                ...executions.map(ex => ({
+                                    label: `${getTestCaseTitle(ex.testCaseId)} - ${new Date(ex.executedAt).toLocaleDateString()}`,
+                                    value: ex._id
+                                }))
+                            ]}
+                            className="rounded-xl"
+                        />
+                    </div>
+
+                    {formErrors.submit && (
+                        <div className="p-3 bg-danger-50 text-danger-600 text-sm font-bold rounded-xl border border-danger-100 italic">
+                            {formErrors.submit}
+                        </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4 border-t border-gray-100">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => { setShowCreateModal(false); resetForm(); }}
+                            className="flex-1 rounded-xl h-11"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 rounded-xl h-11 shadow-lg shadow-primary-500/20 font-semibold">
+                            Create Defect
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Edit Defect Modal */}
-            {showEditModal && selectedDefect && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <Card className="w-full max-w-2xl my-8">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Edit Defect</h2>
-                            <button
-                                onClick={() => { setShowEditModal(false); resetForm(); setSelectedDefect(null); }}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleEditDefect} className="max-h-[70vh] overflow-y-auto pr-2">
-                            <Input
-                                label="Title"
-                                name="title"
-                                value={formData.title}
+            <Modal
+                isOpen={showEditModal && !!selectedDefect}
+                onClose={() => { setShowEditModal(false); resetForm(); setSelectedDefect(null); }}
+                title="Edit Defect"
+                size="3xl"
+            >
+                <form onSubmit={handleEditDefect} className="space-y-6">
+                    <Input
+                        label="Defect Title"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleInputChange}
+                        error={formErrors.title}
+                        className="rounded-xl"
+                    />
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Description
+                        </label>
+                        <textarea
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            rows={3}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
+                        {formErrors.description && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium">{formErrors.description}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-warning-500" />
+                            Steps to Reproduce
+                        </label>
+                        <textarea
+                            name="stepsToReproduce"
+                            value={formData.stepsToReproduce}
+                            onChange={handleInputChange}
+                            rows={4}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400 font-mono"
+                        />
+                        {formErrors.stepsToReproduce && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium">{formErrors.stepsToReproduce}</p>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold text-success-700">
+                                Expected Result
+                            </label>
+                            <textarea
+                                name="expectedResult"
+                                value={formData.expectedResult}
                                 onChange={handleInputChange}
-                                error={formErrors.title}
-                                placeholder="Enter defect title"
+                                rows={2}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
                             />
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Description
-                                </label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter defect description"
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.description && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.description}</p>
-                                )}
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Steps to Reproduce
-                                </label>
-                                <textarea
-                                    name="stepsToReproduce"
-                                    value={formData.stepsToReproduce}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter steps to reproduce the defect"
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.stepsToReproduce && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.stepsToReproduce}</p>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Expected Result</label>
-                                    <textarea
-                                        name="expectedResult"
-                                        value={formData.expectedResult}
-                                        onChange={handleInputChange}
-                                        placeholder="What was expected to happen"
-                                        rows={3}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Actual Result</label>
-                                    <textarea
-                                        name="actualResult"
-                                        value={formData.actualResult}
-                                        onChange={handleInputChange}
-                                        placeholder="What actually happened"
-                                        rows={3}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
-                                    <select
-                                        name="projectId"
-                                        value={formData.projectId}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="">Select project</option>
-                                        {projects.map(project => (
-                                            <option key={project._id} value={project._id}>{project.name}</option>
-                                        ))}
-                                    </select>
-                                    {formErrors.projectId && (
-                                        <p className="mt-1 text-sm text-danger-600">{formErrors.projectId}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Severity</label>
-                                    <select
-                                        name="severity"
-                                        value={formData.severity}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="trivial">Trivial</option>
-                                        <option value="minor">Minor</option>
-                                        <option value="major">Major</option>
-                                        <option value="critical">Critical</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                                <select
-                                    name="priority"
-                                    value={formData.priority}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="critical">Critical</option>
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Test Case (Optional)</label>
-                                    <select
-                                        name="testCaseId"
-                                        value={formData.testCaseId}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="">Select test case</option>
-                                        {testCases.map(testCase => (
-                                            <option key={testCase._id} value={testCase._id}>{testCase.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Execution (Optional)</label>
-                                    <select
-                                        name="executionId"
-                                        value={formData.executionId}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    >
-                                        <option value="">Select execution</option>
-                                        {executions.map(execution => (
-                                            <option key={execution._id} value={execution._id}>
-                                                {getTestCaseTitle(execution.testCaseId)} - {new Date(execution.executedAt).toLocaleDateString()}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
-                                <select
-                                    name="assignedTo"
-                                    value={formData.assignedTo}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="">Unassigned</option>
-                                    {users.map(user => (
-                                        <option key={user._id} value={user._id}>{user.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            {formErrors.submit && (
-                                <div className="mb-4 text-sm text-danger-600">{formErrors.submit}</div>
-                            )}
-                            <div className="flex gap-3">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => { setShowEditModal(false); resetForm(); setSelectedDefect(null); }}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" className="flex-1">
-                                    Save Changes
-                                </Button>
-                            </div>
-                        </form>
-                    </Card>
-                </div>
-            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold text-danger-700">
+                                Actual Result
+                            </label>
+                            <textarea
+                                name="actualResult"
+                                value={formData.actualResult}
+                                onChange={handleInputChange}
+                                rows={2}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Select
+                            label="Project"
+                            name="projectId"
+                            value={formData.projectId}
+                            onChange={handleInputChange}
+                            error={formErrors.projectId}
+                            options={[
+                                { label: 'Select project', value: '' },
+                                ...projects.map(p => ({ label: p.name, value: p._id }))
+                            ]}
+                            className="rounded-xl"
+                        />
+                        <Select
+                            label="Severity"
+                            name="severity"
+                            value={formData.severity}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Trivial', value: 'trivial' },
+                                { label: 'Minor', value: 'minor' },
+                                { label: 'Major', value: 'major' },
+                                { label: 'Critical', value: 'critical' }
+                            ]}
+                            className="rounded-xl"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Select
+                            label="Priority"
+                            name="priority"
+                            value={formData.priority}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Low', value: 'low' },
+                                { label: 'Medium', value: 'medium' },
+                                { label: 'High', value: 'high' },
+                                { label: 'Critical', value: 'critical' }
+                            ]}
+                            className="rounded-xl"
+                        />
+                        <Select
+                            label="Assign To"
+                            name="assignedTo"
+                            value={formData.assignedTo}
+                            onChange={handleInputChange}
+                            options={[
+                                { label: 'Unassigned', value: '' },
+                                ...users.map(u => ({ label: u.name, value: u._id }))
+                            ]}
+                            className="rounded-xl"
+                        />
+                    </div>
+
+                    {formErrors.submit && (
+                        <div className="p-3 bg-danger-50 text-danger-600 text-sm font-bold rounded-xl border border-danger-100 italic">
+                            {formErrors.submit}
+                        </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4 border-t border-gray-100">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => { setShowEditModal(false); resetForm(); setSelectedDefect(null); }}
+                            className="flex-1 rounded-xl h-11"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 rounded-xl h-11 shadow-lg shadow-primary-500/20 font-semibold">
+                            Save Changes
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Delete Confirmation Modal */}
-            {showDeleteModal && selectedDefect && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Delete Defect</h2>
-                            <button
-                                onClick={() => setShowDeleteModal(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="mb-6">
-                            <p className="text-gray-700">
-                                Are you sure you want to delete the defect <strong>"{selectedDefect.title}"</strong>?
-                            </p>
-                            <p className="text-sm text-gray-500 mt-2">
-                                This action will soft delete the defect and all associated data.
-                            </p>
-                        </div>
-                        <div className="flex gap-3">
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowDeleteModal(false)}
-                                className="flex-1"
-                            >
-                                Cancel
-                            </Button>
-                            <Button variant="danger" onClick={handleDeleteDefect} className="flex-1">
-                                Delete Defect
-                            </Button>
-                        </div>
-                    </Card>
+            <Modal
+                isOpen={showDeleteModal && !!selectedDefect}
+                onClose={() => { setShowDeleteModal(false); setSelectedDefect(null); }}
+                title="Delete Defect"
+                size="md"
+            >
+                <div className="space-y-6">
+                    <div className="flex items-center justify-center w-16 h-16 mx-auto bg-danger-50 rounded-full">
+                        <Trash2 className="h-8 w-8 text-danger-500" />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-gray-600">
+                            Are you sure you want to delete <span className="font-bold text-gray-900">"{selectedDefect?.title}"</span>? This action cannot be undone.
+                        </p>
+                    </div>
+                    <div className="flex gap-4">
+                        <Button
+                            variant="secondary"
+                            onClick={() => { setShowDeleteModal(false); setSelectedDefect(null); }}
+                            className="flex-1 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={handleDeleteDefect}
+                            className="flex-1 rounded-xl shadow-lg shadow-danger-500/20 font-semibold"
+                        >
+                            Delete
+                        </Button>
+                    </div>
                 </div>
-            )}
+            </Modal>
 
             {/* Assign Modal */}
-            {showAssignModal && selectedDefect && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Assign Defect</h2>
-                            <button
-                                onClick={() => { setShowAssignModal(false); setSelectedDefect(null); }}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="mb-6">
-                            <p className="text-gray-700 mb-4">
-                                Assign defect <strong>"{selectedDefect.title}"</strong> to:
-                            </p>
-                            <select
-                                name="assignedTo"
-                                value={formData.assignedTo}
-                                onChange={handleInputChange}
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                                <option value="">Unassigned</option>
-                                {users.map(user => (
-                                    <option key={user._id} value={user._id}>{user.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex gap-3">
-                            <Button
-                                variant="secondary"
-                                onClick={() => { setShowAssignModal(false); setSelectedDefect(null); }}
-                                className="flex-1"
-                            >
-                                Cancel
-                            </Button>
-                            <Button onClick={handleAssignDefect} className="flex-1">
-                                Assign
-                            </Button>
-                        </div>
-                    </Card>
+            <Modal
+                isOpen={showAssignModal && !!selectedDefect}
+                onClose={() => { setShowAssignModal(false); setSelectedDefect(null); }}
+                title="Assign Defect"
+                size="md"
+            >
+                <div className="space-y-6">
+                    <Select
+                        label="Select Team Member"
+                        name="assignedTo"
+                        value={formData.assignedTo}
+                        onChange={handleInputChange}
+                        options={[
+                            { label: 'Unassigned', value: '' },
+                            ...users.map(u => ({ label: u.name, value: u._id }))
+                        ]}
+                        className="rounded-xl"
+                    />
+                    <div className="flex gap-4">
+                        <Button
+                            variant="secondary"
+                            onClick={() => { setShowAssignModal(false); setSelectedDefect(null); }}
+                            className="flex-1 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleAssignDefect}
+                            className="flex-1 rounded-xl shadow-lg shadow-primary-500/20 font-semibold"
+                        >
+                            Assign
+                        </Button>
+                    </div>
                 </div>
-            )}
+            </Modal>
 
             {/* Status Update Modal */}
-            {showStatusModal && selectedDefect && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Update Defect Status</h2>
+            <Modal
+                isOpen={showStatusModal && !!selectedDefect}
+                onClose={() => { setShowStatusModal(false); setSelectedDefect(null); }}
+                title="Update Status"
+                size="md"
+            >
+                <div className="space-y-6">
+                    <div className="space-y-3">
+                        {statusFlow.map((status) => (
                             <button
-                                onClick={() => { setShowStatusModal(false); setSelectedDefect(null); }}
-                                className="text-gray-400 hover:text-gray-600"
+                                key={status}
+                                type="button"
+                                onClick={() => setFormData(prev => ({ ...prev, status }))}
+                                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all group ${formData.status === status
+                                    ? 'border-primary-500 bg-primary-50/50 shadow-sm'
+                                    : 'border-gray-100 hover:border-primary-200 hover:bg-gray-50'
+                                    }`}
                             >
-                                <X className="h-6 w-6" />
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2 h-2 rounded-full ${formData.status === status ? 'bg-primary-500 animate-pulse' : 'bg-gray-300'}`} />
+                                    <span className={`font-bold capitalize ${formData.status === status ? 'text-primary-900' : 'text-gray-600'}`}>
+                                        {status?.replace('_', ' ')}
+                                    </span>
+                                </div>
+                                <Badge variant={getStatusVariant(status)} className="opacity-80 group-hover:opacity-100">
+                                    {status?.replace('_', ' ')}
+                                </Badge>
                             </button>
-                        </div>
-                        <div className="mb-6">
-                            <p className="text-gray-700 mb-4">
-                                Update status for defect <strong>"{selectedDefect.title}"</strong>:
-                            </p>
-                            <div className="space-y-2">
-                                {statusFlow.map((status, index) => (
-                                    <button
-                                        key={status}
-                                        type="button"
-                                        onClick={() => setFormData(prev => ({ ...prev, status }))}
-                                        className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-colors ${formData.status === status
-                                            ? 'border-primary-500 bg-primary-50'
-                                            : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <span className="font-medium text-gray-900 capitalize">
-                                            {status.replace('_', ' ')}
-                                        </span>
-                                        {getStatusBadge(status)}
-                                        {index < statusFlow.length - 1 && (
-                                            <ArrowRight className="h-4 w-4 text-gray-400" />
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="flex gap-3">
-                            <Button
-                                variant="secondary"
-                                onClick={() => { setShowStatusModal(false); setSelectedDefect(null); }}
-                                className="flex-1"
-                            >
-                                Cancel
-                            </Button>
-                            <Button onClick={handleUpdateStatus} className="flex-1">
-                                Update Status
-                            </Button>
-                        </div>
-                    </Card>
+                        ))}
+                    </div>
+                    <div className="flex gap-4">
+                        <Button
+                            variant="secondary"
+                            onClick={() => { setShowStatusModal(false); setSelectedDefect(null); }}
+                            className="flex-1 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleUpdateStatus}
+                            className="flex-1 rounded-xl shadow-lg shadow-primary-500/20 font-semibold"
+                        >
+                            Update Status
+                        </Button>
+                    </div>
                 </div>
-            )}
+            </Modal>
 
             {/* Details Modal */}
-            {showDetailsModal && selectedDefect && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <Card className="w-full max-w-2xl my-8">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Defect Details</h2>
-                            <button
-                                onClick={() => { setShowDetailsModal(false); setSelectedDefect(null); }}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
+            <Modal
+                isOpen={showDetailsModal && !!selectedDefect}
+                onClose={() => { setShowDetailsModal(false); setSelectedDefect(null); }}
+                title="Defect Details"
+                size="4xl"
+            >
+                <div className="space-y-8">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Badge variant={getStatusVariant(selectedDefect?.status)} className="px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-lg shadow-sm">
+                            {selectedDefect?.status?.replace('_', ' ')}
+                        </Badge>
+                        <Badge variant={getSeverityVariant(selectedDefect?.severity)} className="px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-lg shadow-sm">
+                            {selectedDefect?.severity}
+                        </Badge>
+                        <Badge variant={getPriorityVariant(selectedDefect?.priority)} className="px-3 py-1 text-xs font-semibold uppercase tracking-wider rounded-lg shadow-sm">
+                            {selectedDefect?.priority}
+                        </Badge>
+                        <span className="text-xs text-gray-400 font-medium ml-auto">
+                            Created {new Date(selectedDefect?.createdAt).toLocaleDateString()}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-6">
+                            <div className="bg-gray-50/50 p-5 rounded-2xl border border-gray-100">
+                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2 uppercase tracking-wide">
+                                    <FileText className="h-4 w-4 text-primary-500" />
+                                    Description
+                                </h3>
+                                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                                    {selectedDefect?.description}
+                                </p>
+                            </div>
+
+                            <div className="bg-warning-50/30 p-5 rounded-2xl border border-warning-100">
+                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2 uppercase tracking-wide">
+                                    <AlertTriangle className="h-4 w-4 text-warning-500" />
+                                    Steps to Reproduce
+                                </h3>
+                                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap font-mono bg-white/50 p-3 rounded-xl border border-warning-100/50">
+                                    {selectedDefect?.stepsToReproduce}
+                                </p>
+                            </div>
                         </div>
-                        <div className="max-h-[70vh] overflow-y-auto pr-2">
-                            <div className="space-y-4">
-                                <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedDefect.title}</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {getSeverityBadge(selectedDefect.severity)}
-                                        {getPriorityBadge(selectedDefect.priority)}
-                                        {getStatusBadge(selectedDefect.status)}
-                                    </div>
+
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="bg-success-50/30 p-5 rounded-2xl border border-success-100">
+                                    <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wide text-success-700">Expected Result</h3>
+                                    <p className="text-sm text-gray-600 leading-relaxed">{selectedDefect?.expectedResult}</p>
                                 </div>
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Description</h4>
-                                    <p className="text-sm text-gray-600">{selectedDefect.description || 'No description'}</p>
+                                <div className="bg-danger-50/30 p-5 rounded-2xl border border-danger-100">
+                                    <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wide text-danger-700">Actual Result</h3>
+                                    <p className="text-sm text-gray-600 leading-relaxed">{selectedDefect?.actualResult}</p>
                                 </div>
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Steps to Reproduce</h4>
-                                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-line">
-                                        {selectedDefect.stepsToReproduce || 'Not provided'}
-                                    </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-500 font-medium">Project</span>
+                                    <span className="text-gray-900 font-bold">{getProjectName(selectedDefect?.projectId)}</span>
                                 </div>
-                                {(selectedDefect.expectedResult || selectedDefect.actualResult) && (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <h4 className="text-sm font-medium text-gray-700 mb-1">Expected Result</h4>
-                                            <p className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
-                                                {selectedDefect.expectedResult || 'Not provided'}
-                                            </p>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-gray-500 font-medium">Assigned To</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700 uppercase">
+                                            {getUserName(selectedDefect?.assignedTo).charAt(0)}
                                         </div>
-                                        <div>
-                                            <h4 className="text-sm font-medium text-gray-700 mb-1">Actual Result</h4>
-                                            <p className="text-sm text-gray-600 bg-red-50 p-3 rounded-lg">
-                                                {selectedDefect.actualResult || 'Not provided'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <h4 className="text-sm font-medium text-gray-700 mb-1">Project</h4>
-                                        <p className="text-sm text-gray-600">{getProjectName(selectedDefect.projectId)}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-medium text-gray-700 mb-1">Assigned To</h4>
-                                        <p className="text-sm text-gray-600">{getUserName(selectedDefect.assignedTo)}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-medium text-gray-700 mb-1">Created At</h4>
-                                        <p className="text-sm text-gray-600">{new Date(selectedDefect.createdAt).toLocaleString()}</p>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-medium text-gray-700 mb-1">Updated At</h4>
-                                        <p className="text-sm text-gray-600">{new Date(selectedDefect.updatedAt).toLocaleString()}</p>
-                                    </div>
-                                </div>
-                                {selectedDefect.testCaseId && (
-                                    <div>
-                                        <h4 className="text-sm font-medium text-gray-700 mb-1">Linked Test Case</h4>
-                                        <p className="text-sm text-gray-600">{getTestCaseTitle(selectedDefect.testCaseId)}</p>
-                                    </div>
-                                )}
-                                {selectedDefect.executionId && (
-                                    <div>
-                                        <h4 className="text-sm font-medium text-gray-700 mb-1">Linked Execution</h4>
-                                        <p className="text-sm text-gray-600">
-                                            {getExecutionDetails(selectedDefect.executionId)?.executedAt
-                                                ? new Date(getExecutionDetails(selectedDefect.executionId).executedAt).toLocaleString()
-                                                : 'Unknown'}
-                                        </p>
-                                    </div>
-                                )}
-                                {/* Status Flow Visualization */}
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Status Flow</h4>
-                                    <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                                        {statusFlow.map((status, index) => (
-                                            <div key={status} className="flex items-center">
-                                                <div
-                                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${selectedDefect.status === status
-                                                        ? 'bg-primary-100 text-primary-800 border-2 border-primary-500'
-                                                        : 'bg-gray-100 text-gray-600 border-2 border-transparent'
-                                                        }`}
-                                                >
-                                                    {status.replace('_', ' ')}
-                                                </div>
-                                                {index < statusFlow.length - 1 && (
-                                                    <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                                )}
-                                            </div>
-                                        ))}
+                                        <span className="text-gray-900 font-bold">{getUserName(selectedDefect?.assignedTo)}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </Card>
+                    </div>
+
+                    <div className="space-y-6 pt-6 border-t border-gray-100">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
+                                <MessageSquare className="h-4 w-4 text-primary-500" />
+                                Comments ({selectedDefect?.comments?.length || 0})
+                            </h3>
+                        </div>
+
+                        <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {selectedDefect?.comments && selectedDefect.comments.length > 0 ? (
+                                selectedDefect.comments.map((comment, index) => (
+                                    <div key={index} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700">
+                                                    {comment.user?.name?.charAt(0) || 'U'}
+                                                </div>
+                                                <span className="text-xs font-bold text-gray-900">{comment.user?.name || 'Unknown User'}</span>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 font-medium">
+                                                {new Date(comment.createdAt).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                                            {comment.text}
+                                        </p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-center py-8 text-sm text-gray-400 italic bg-gray-50/30 rounded-2xl border border-dashed border-gray-200">
+                                    No comments yet.
+                                </p>
+                            )}
+                        </div>
+
+                        {currentUser && currentUser.role !== 'product_manager' && (
+                            <form onSubmit={handleAddComment} className="relative mt-4">
+                                <textarea
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    placeholder={
+                                        currentUser.role === 'developer' && selectedDefect?.assignedTo?._id !== currentUser._id
+                                            ? "Only assigned developers can comment"
+                                            : "Add a comment..."
+                                    }
+                                    disabled={isSubmittingComment || (currentUser.role === 'developer' && selectedDefect?.assignedTo?._id !== currentUser._id)}
+                                    rows={2}
+                                    className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400 bg-white shadow-sm"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingComment || !newComment.trim() || (currentUser.role === 'developer' && selectedDefect?.assignedTo?._id !== currentUser._id)}
+                                    className="absolute right-3 bottom-3 p-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-primary-500/20"
+                                >
+                                    {isSubmittingComment ? (
+                                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+
+                    <div className="flex gap-4 pt-4 border-t border-gray-100">
+                        <Button
+                            variant="secondary"
+                            onClick={() => { setShowDetailsModal(false); setSelectedDefect(null); }}
+                            className="flex-1 rounded-xl h-11"
+                        >
+                            Close
+                        </Button>
+                        {canEditDefect(selectedDefect) && (
+                            <Button
+                                onClick={() => openEditModal(selectedDefect)}
+                                className="flex-1 rounded-xl h-11 shadow-lg shadow-primary-500/20 font-semibold"
+                            >
+                                Edit Defect
+                            </Button>
+                        )}
+                    </div>
                 </div>
-            )}
+            </Modal>
         </DashboardLayout>
     );
 }

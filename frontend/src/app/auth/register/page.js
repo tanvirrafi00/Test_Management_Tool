@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../hooks/useAuth';
 import { UserPlus, Mail, Lock, User } from 'lucide-react';
@@ -9,7 +9,7 @@ import { Input } from '../../../components/ui/Input';
 
 export default function Register() {
     const router = useRouter();
-    const { register } = useAuth();
+    const { register, isAuthenticated, loading: authLoading } = useAuth();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -18,6 +18,13 @@ export default function Register() {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            router.push('/dashboard');
+        }
+    }, [isAuthenticated, authLoading, router]);
 
     const handleChange = (e) => {
         setFormData({

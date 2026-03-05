@@ -7,6 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
+import { Select } from '../../components/ui/Select';
 import {
     Plus,
     Search,
@@ -117,6 +119,24 @@ export default function Executions() {
         }
     };
 
+    // Get test plan name
+    const getTestPlanName = (testPlanId) => {
+        const testPlan = testPlans.find(tp => tp._id === testPlanId);
+        return testPlan?.name || 'Unknown';
+    };
+
+    // Get test case title
+    const getTestCaseTitle = (testCaseId) => {
+        const testCase = testCases.find(tc => tc._id === testCaseId);
+        return testCase?.title || 'Unknown';
+    };
+
+    // Get user name
+    const getUserName = (userId) => {
+        const user = users.find(u => u._id === userId);
+        return user?.name || 'Unknown';
+    };
+
     // Filter executions
     const filteredExecutions = executions.filter(execution => {
         const matchesSearch = execution.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -212,23 +232,6 @@ export default function Executions() {
         }));
     };
 
-    // Get test plan name
-    const getTestPlanName = (testPlanId) => {
-        const testPlan = testPlans.find(tp => tp._id === testPlanId);
-        return testPlan?.name || 'Unknown';
-    };
-
-    // Get test case title
-    const getTestCaseTitle = (testCaseId) => {
-        const testCase = testCases.find(tc => tc._id === testCaseId);
-        return testCase?.title || 'Unknown';
-    };
-
-    // Get user name
-    const getUserName = (userId) => {
-        const user = users.find(u => u._id === userId);
-        return user?.name || 'Unknown';
-    };
 
     // Get status badge
     const getStatusBadge = (status) => {
@@ -291,60 +294,64 @@ export default function Executions() {
                 )}
 
                 {/* Filters */}
-                <Card className="p-4">
-                    <div className="flex flex-col lg:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Card className="p-4 bg-gray-50/50 border-gray-100 shadow-sm">
+                    <div className="flex flex-col xl:flex-row gap-4">
+                        <div className="flex-1 relative group">
+                            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Search executions..."
+                                placeholder="Search by comment, test plan or case..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm placeholder:text-gray-400"
                             />
                         </div>
-                        <select
-                            value={testPlanFilter}
-                            onChange={(e) => setTestPlanFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Test Plans</option>
-                            {testPlans.map(testPlan => (
-                                <option key={testPlan._id} value={testPlan._id}>{testPlan.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={testCaseFilter}
-                            onChange={(e) => setTestCaseFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Test Cases</option>
-                            {testCases.map(testCase => (
-                                <option key={testCase._id} value={testCase._id}>{testCase.title}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="not_run">Not Run</option>
-                            <option value="pass">Pass</option>
-                            <option value="fail">Fail</option>
-                            <option value="blocked">Blocked</option>
-                            <option value="retest">Retest</option>
-                        </select>
-                        <select
-                            value={executedByFilter}
-                            onChange={(e) => setExecutedByFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                            <option value="all">All Executors</option>
-                            {users.map(user => (
-                                <option key={user._id} value={user._id}>{user.name}</option>
-                            ))}
-                        </select>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <Select
+                                value={testPlanFilter}
+                                onChange={(e) => setTestPlanFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Plans', value: 'all' },
+                                    ...testPlans.map(tp => ({ label: tp.name, value: tp._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5 text-xs"
+                            />
+                            <Select
+                                value={testCaseFilter}
+                                onChange={(e) => setTestCaseFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Cases', value: 'all' },
+                                    ...testCases.map(tc => ({ label: tc.title, value: tc._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5 text-xs"
+                            />
+                            <Select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Status', value: 'all' },
+                                    { label: 'Not Run', value: 'not_run' },
+                                    { label: 'Pass', value: 'pass' },
+                                    { label: 'Fail', value: 'fail' },
+                                    { label: 'Blocked', value: 'blocked' },
+                                    { label: 'Retest', value: 'retest' },
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5 text-xs"
+                            />
+                            <Select
+                                value={executedByFilter}
+                                onChange={(e) => setExecutedByFilter(e.target.value)}
+                                options={[
+                                    { label: 'All Executors', value: 'all' },
+                                    ...users.map(u => ({ label: u.name, value: u._id }))
+                                ]}
+                                containerClassName="mb-0"
+                                className="rounded-xl py-2.5 text-xs"
+                            />
+                        </div>
                     </div>
                 </Card>
 
@@ -447,13 +454,14 @@ export default function Executions() {
                                 )}
 
                                 {/* Action Buttons */}
-                                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-200">
+                                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
                                     {!expandedExecutions[execution._id] && (
                                         <>
                                             <Button
                                                 variant="secondary"
                                                 size="sm"
                                                 onClick={() => toggleExpanded(execution._id)}
+                                                className="rounded-lg text-xs"
                                             >
                                                 View Details
                                             </Button>
@@ -461,8 +469,9 @@ export default function Executions() {
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => handleReExecute(execution)}
+                                                className="rounded-lg text-xs"
                                             >
-                                                <RotateCcw className="h-4 w-4 mr-1" />
+                                                <RotateCcw className="h-3.5 w-3.5 mr-1" />
                                                 Re-execute
                                             </Button>
                                         </>
@@ -475,198 +484,218 @@ export default function Executions() {
             </div>
 
             {/* Create Execution Modal */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Create New Execution</h2>
-                            <button
-                                onClick={() => { setShowCreateModal(false); resetForm(); }}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreateExecution}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Test Plan</label>
-                                <select
-                                    name="testPlanId"
-                                    value={formData.testPlanId}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="">Select test plan</option>
-                                    {testPlans.map(testPlan => (
-                                        <option key={testPlan._id} value={testPlan._id}>{testPlan.name}</option>
-                                    ))}
-                                </select>
-                                {formErrors.testPlanId && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.testPlanId}</p>
-                                )}
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Test Case</label>
-                                <select
-                                    name="testCaseId"
-                                    value={formData.testCaseId}
-                                    onChange={handleInputChange}
-                                    disabled={!formData.testPlanId}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                    <option value="">Select test case</option>
-                                    {getFilteredTestCases().map(testCase => (
-                                        <option key={testCase._id} value={testCase._id}>{testCase.title}</option>
-                                    ))}
-                                </select>
-                                {formErrors.testCaseId && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.testCaseId}</p>
-                                )}
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                <select
-                                    name="status"
-                                    value={formData.status}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="not_run">Not Run</option>
-                                    <option value="pass">Pass</option>
-                                    <option value="fail">Fail</option>
-                                    <option value="blocked">Blocked</option>
-                                    <option value="retest">Retest</option>
-                                </select>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Comment</label>
-                                <textarea
-                                    name="comment"
-                                    value={formData.comment}
-                                    onChange={handleInputChange}
-                                    placeholder="Add execution notes..."
-                                    rows={4}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                                />
-                                {formErrors.comment && (
-                                    <p className="mt-1 text-sm text-danger-600">{formErrors.comment}</p>
-                                )}
-                            </div>
-                            {formData.status === 'fail' && (
-                                <div className="mb-4">
-                                    <label className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            name="createDefect"
-                                            checked={formData.createDefect}
-                                            onChange={handleInputChange}
-                                            className="mr-2 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                        />
-                                        <span className="text-sm text-gray-700">Create defect automatically</span>
-                                    </label>
-                                    <p className="text-xs text-gray-500 mt-1 ml-6">
-                                        A defect will be created with the execution details
-                                    </p>
+            <Modal
+                isOpen={showCreateModal}
+                onClose={() => { setShowCreateModal(false); resetForm(); }}
+                title="Log New Test Execution"
+                size="md"
+            >
+                <form onSubmit={handleCreateExecution}>
+                    <Select
+                        label="Test Plan"
+                        name="testPlanId"
+                        value={formData.testPlanId}
+                        onChange={handleInputChange}
+                        error={formErrors.testPlanId}
+                        options={[
+                            { label: 'Select test plan', value: '' },
+                            ...testPlans.map(tp => ({ label: tp.name, value: tp._id }))
+                        ]}
+                        className="rounded-xl"
+                    />
+
+                    <Select
+                        label="Test Case"
+                        name="testCaseId"
+                        value={formData.testCaseId}
+                        onChange={handleInputChange}
+                        disabled={!formData.testPlanId}
+                        error={formErrors.testCaseId}
+                        options={[
+                            { label: 'Select test case', value: '' },
+                            ...getFilteredTestCases().map(tc => ({ label: tc.title, value: tc._id }))
+                        ]}
+                        className="rounded-xl"
+                    />
+
+                    <Select
+                        label="Status"
+                        name="status"
+                        value={formData.status}
+                        onChange={handleInputChange}
+                        options={[
+                            { label: 'Not Run', value: 'not_run' },
+                            { label: 'Pass', value: 'pass' },
+                            { label: 'Fail', value: 'fail' },
+                            { label: 'Blocked', value: 'blocked' },
+                            { label: 'Retest', value: 'retest' },
+                        ]}
+                        className="rounded-xl"
+                    />
+
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 font-semibold">
+                            Comment
+                        </label>
+                        <textarea
+                            name="comment"
+                            value={formData.comment}
+                            onChange={handleInputChange}
+                            placeholder="Add execution notes, found issues, or environment info..."
+                            rows={4}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all text-sm resize-none placeholder:text-gray-400"
+                        />
+                        {formErrors.comment && (
+                            <p className="mt-1.5 text-sm text-danger-600 font-medium animate-in fade-in slide-in-from-top-1 duration-200">{formErrors.comment}</p>
+                        )}
+                    </div>
+
+                    {formData.status === 'fail' && (
+                        <div className="mb-6 bg-danger-50 p-4 rounded-xl border border-danger-100 animate-in zoom-in-95 duration-200">
+                            <label className="flex items-center cursor-pointer group">
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        name="createDefect"
+                                        checked={formData.createDefect}
+                                        onChange={handleInputChange}
+                                        className="sr-only"
+                                    />
+                                    <div className={`w-10 h-5 bg-gray-200 rounded-full shadow-inner transition-colors ${formData.createDefect ? 'bg-danger-500' : 'bg-gray-300'}`}></div>
+                                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${formData.createDefect ? 'transform translate-x-5' : ''}`}></div>
                                 </div>
-                            )}
-                            {formErrors.submit && (
-                                <div className="mb-4 text-sm text-danger-600">{formErrors.submit}</div>
-                            )}
-                            <div className="flex gap-3">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => { setShowCreateModal(false); resetForm(); }}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" className="flex-1">
-                                    Create Execution
-                                </Button>
-                            </div>
-                        </form>
-                    </Card>
-                </div>
-            )}
+                                <span className="ml-3 text-sm font-semibold text-danger-900">Create defect automatically</span>
+                            </label>
+                            <p className="text-xs text-danger-600 mt-2 ml-0 font-medium">
+                                A defect will be logged automatically including these execution results.
+                            </p>
+                        </div>
+                    )}
+
+                    {formErrors.submit && (
+                        <div className="mb-4 text-sm text-danger-600 font-bold bg-danger-50 p-3 rounded-lg border border-danger-100">{formErrors.submit}</div>
+                    )}
+
+                    <div className="flex gap-3 pt-4 border-t border-gray-100">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => { setShowCreateModal(false); resetForm(); }}
+                            className="flex-1 rounded-xl"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1 rounded-xl shadow-lg shadow-primary-500/20">
+                            Create Execution
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
 
             {/* Details Modal */}
-            {showDetailsModal && selectedExecution && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-md">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-bold text-gray-900">Execution Details</h2>
-                            <button
-                                onClick={() => { setShowDetailsModal(false); setSelectedExecution(null); }}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="h-6 w-6" />
-                            </button>
+            <Modal
+                isOpen={showDetailsModal && !!selectedExecution}
+                onClose={() => { setShowDetailsModal(false); setSelectedExecution(null); }}
+                title="Execution Details"
+                size="md"
+            >
+                <div className="space-y-6">
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2 pr-4 leading-tight">
+                                {getTestCaseTitle(selectedExecution?.testCaseId)}
+                            </h3>
+                            <div className="flex items-center gap-3">
+                                {getStatusBadge(selectedExecution?.status)}
+                                <span className="text-xs text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-md border border-gray-100">
+                                    ID: {selectedExecution?._id?.substring(0, 8)}
+                                </span>
+                            </div>
                         </div>
-                        <div className="space-y-4">
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 p-5 bg-gray-50/50 rounded-2xl border border-gray-100">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <ClipboardList className="h-4 w-4 text-primary-500" />
+                            </div>
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                                    {getTestCaseTitle(selectedExecution.testCaseId)}
-                                </h3>
-                                {getStatusBadge(selectedExecution.status)}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Test Plan</h4>
-                                    <p className="text-sm text-gray-600">{getTestPlanName(selectedExecution.testPlanId)}</p>
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Executed By</h4>
-                                    <p className="text-sm text-gray-600">{getUserName(selectedExecution.executedBy)}</p>
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Executed At</h4>
-                                    <p className="text-sm text-gray-600">
-                                        {new Date(selectedExecution.executedAt).toLocaleString()}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Duration</h4>
-                                    <p className="text-sm text-gray-600">
-                                        {selectedExecution.duration ? `${selectedExecution.duration}s` : 'N/A'}
-                                    </p>
-                                </div>
-                            </div>
-                            {selectedExecution.comment && (
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Comment</h4>
-                                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                                        {selectedExecution.comment}
-                                    </p>
-                                </div>
-                            )}
-                            {selectedExecution.defectId && (
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Linked Defect</h4>
-                                    <Badge variant="danger">
-                                        <AlertTriangle className="h-3 w-3 mr-1" />
-                                        Defect Created
-                                    </Badge>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Created At</h4>
-                                    <p className="text-sm text-gray-600">
-                                        {new Date(selectedExecution.createdAt).toLocaleString()}
-                                    </p>
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-1">Updated At</h4>
-                                    <p className="text-sm text-gray-600">
-                                        {new Date(selectedExecution.updatedAt).toLocaleString()}
-                                    </p>
-                                </div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Test Plan</h4>
+                                <p className="text-sm font-semibold text-gray-700">{getTestPlanName(selectedExecution?.testPlanId)}</p>
                             </div>
                         </div>
-                    </Card>
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <User className="h-4 w-4 text-primary-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Executed By</h4>
+                                <p className="text-sm font-semibold text-gray-700">{getUserName(selectedExecution?.executedBy)}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <Calendar className="h-4 w-4 text-primary-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Executed At</h4>
+                                <p className="text-sm font-semibold text-gray-700">
+                                    {selectedExecution && new Date(selectedExecution.executedAt).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-white rounded-lg shadow-sm">
+                                <Clock className="h-4 w-4 text-primary-500" />
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">Duration</h4>
+                                <p className="text-sm font-semibold text-gray-700">
+                                    {selectedExecution?.duration ? `${selectedExecution.duration}s` : 'Not recorded'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {selectedExecution?.comment && (
+                        <div>
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <FileText className="h-3.5 w-3.5 text-primary-500" />
+                                Execution Comment
+                            </h4>
+                            <div className="text-sm text-gray-600 bg-white p-4 rounded-xl border border-gray-100 shadow-sm italic leading-relaxed">
+                                "{selectedExecution.comment}"
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedExecution?.defectId && (
+                        <div className="p-4 bg-danger-50 rounded-xl border border-danger-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white rounded-lg shadow-sm">
+                                    <AlertTriangle className="h-4 w-4 text-danger-500" />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-bold text-danger-900">Linked Defect Found</h4>
+                                    <p className="text-xs text-danger-600 font-medium">Auto-generated during failure</p>
+                                </div>
+                            </div>
+                            <Button variant="danger" size="sm" className="rounded-lg h-8 px-3 text-xs">
+                                View Defect
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="flex pt-4 border-t border-gray-100 mt-2">
+                        <Button
+                            onClick={() => { setShowDetailsModal(false); setSelectedExecution(null); }}
+                            className="w-full rounded-xl"
+                        >
+                            Done
+                        </Button>
+                    </div>
                 </div>
-            )}
+            </Modal>
         </DashboardLayout>
     );
 }
